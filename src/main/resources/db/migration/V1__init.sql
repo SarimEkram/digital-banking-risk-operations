@@ -11,7 +11,7 @@ create table if not exists users (
 create table if not exists accounts (
   id bigserial primary key,
   user_id bigint not null references users(id) on delete restrict,
-  currency char(3) not null default 'CAD',
+  currency varchar(3) not null default 'CAD',
   balance_cents bigint not null default 0,
   status text not null default 'ACTIVE' check (status in ('ACTIVE','FROZEN','CLOSED')),
   created_at timestamptz not null default now(),
@@ -25,7 +25,7 @@ create table if not exists transfers (
   from_account_id bigint not null references accounts(id) on delete restrict,
   to_account_id bigint not null references accounts(id) on delete restrict,
   amount_cents bigint not null check (amount_cents > 0),
-  currency char(3) not null default 'CAD',
+  currency varchar(3) not null default 'CAD',
   status text not null check (status in ('INITIATED','PENDING_REVIEW','BLOCKED','REJECTED','COMPLETED')),
   risk_decision text null check (risk_decision in ('APPROVE','HOLD','BLOCK')),
   risk_score int null check (risk_score between 0 and 100),
@@ -46,7 +46,7 @@ create table if not exists ledger_entries (
   account_id bigint not null references accounts(id) on delete restrict,
   direction text not null check (direction in ('DEBIT','CREDIT')),
   amount_cents bigint not null check (amount_cents > 0),
-  currency char(3) not null default 'CAD',
+  currency varchar(3) not null default 'CAD',
   created_at timestamptz not null default now()
 );
 
