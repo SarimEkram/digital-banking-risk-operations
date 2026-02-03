@@ -1,65 +1,50 @@
 package com.sarim.digitalbanking.auth.api;
 
-import com.sarim.digitalbanking.accounts.AccountEntity;
-import com.sarim.digitalbanking.accounts.AccountRepository;
-import com.sarim.digitalbanking.auth.UserEntity;
-import com.sarim.digitalbanking.auth.UserRepository;
-import com.sarim.digitalbanking.auth.UserRole;
+import com.sarim.digitalbanking.auth.AuthService;
+import com.sarim.digitalbanking.auth.AuthService.RegisterResult;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final UserRepository userRepository;
-    private final AccountRepository accountRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AuthService authService;
 
-    public AuthController(UserRepository userRepository,
-                          AccountRepository accountRepository,
-                          PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.accountRepository = accountRepository;
-        this.passwordEncoder = passwordEncoder;
+    public AuthController(AuthService authService) {
+        this.authService = authService;
     }
 
+    // Request + Response DTOs for the API
+    public record RegisterRequest(
+            @NotBlank @Email String email,
+            @NotBlank @Size(min = 8, max = 72) String password
+    ) {}
+
+    public record RegisterResponse(
+            Long userId,
+            String email,
+            Long accountId
+    ) {}
+
     @PostMapping("/register")
-    @Transactional
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
-        String email = req.email().trim().toLowerCase(Locale.ROOT);
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest req) {
+        RegisterResult result = authService.register(req.email(), req.password());
 
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("email already registered");
-        }
-
-        UserEntity user = new UserEntity();
-        user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setRole(UserRole.USER);
-
-        UserEntity savedUser = userRepository.save(user);
-
-        AccountEntity account = new AccountEntity();
-        account.setUser(savedUser);
-        account.setCurrency("CAD");
-        account.setBalanceCents(0L);
-        account.setStatus("ACTIVE");
-
-        AccountEntity savedAccount = accountRepository.save(account);
-
-        RegisterResponse res = new RegisterResponse(savedUser.getId(), savedUser.getEmail(), savedAccount.getId());
+        RegisterResponse body = new RegisterResponse(
+                result.userId(),
+                result.email(),
+                result.accountId()
+        );
 
         return ResponseEntity
-                .created(URI.create("/api/users/" + savedUser.getId()))
-                .body(res);
+                .created(URI.create("/api/users/" + result.userId()))
+                .body(body);
     }
 }

@@ -15,12 +15,13 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // For now: ignore CSRF for API endpoints so curl/postman works
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
-
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/health",
+                        "/auth/**",
+                        "/api/auth/**"
+                ))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/health").permitAll()
-                        .requestMatchers("/api/auth/register").permitAll()
+                        .requestMatchers("/health", "/auth/**", "/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(Customizer.withDefaults())
@@ -28,6 +29,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 
     @Bean
     PasswordEncoder passwordEncoder() {
