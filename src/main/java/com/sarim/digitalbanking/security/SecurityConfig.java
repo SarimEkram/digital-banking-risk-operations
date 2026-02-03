@@ -15,13 +15,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/health",
-                        "/auth/**",
-                        "/api/auth/**"
-                ))
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/health", "/auth/**", "/api/auth/**").permitAll()
+                        .requestMatchers("/health", "/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(Customizer.withDefaults())
@@ -29,7 +25,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 
     @Bean
     PasswordEncoder passwordEncoder() {
