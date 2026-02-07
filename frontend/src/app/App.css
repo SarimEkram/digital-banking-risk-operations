@@ -48,13 +48,14 @@ h1 {
 
 
 .form label {
+  width: 100%;
   display: grid;
   gap: 6px;
   margin: 12px 0;
   font-size: 13px;
   color: #cbd5e1;
-  width: 100%;
 }
+
 
 input {
   width: 100%;
@@ -75,8 +76,6 @@ button {
   margin-top: 14px;
   width: 100%;
   max-width: 360px;
-  margin-left: auto;
-  margin-right: auto;
   display: block;
 
   padding: 10px 12px;
