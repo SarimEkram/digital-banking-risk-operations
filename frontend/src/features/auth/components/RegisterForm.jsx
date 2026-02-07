@@ -6,13 +6,14 @@ import { register } from "../api";
 export default function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
-  const [output, setOutput] = useState(null);
+  const [result, setResult] = useState(null); // { kind: "success"|"error", text: string }
 
   async function onSubmit(e) {
     e.preventDefault();
     setLoading(true);
-    setOutput(null);
+    setResult(null);
 
     try {
       const { ok, status, body } = await register({
@@ -21,20 +22,30 @@ export default function RegisterForm() {
       });
 
       if (!ok) {
-        const errText = typeof body === "string" ? body : JSON.stringify(body, null, 2);
-        setOutput(`Registration failed (${status})\n\n${errText}`);
+        const errText =
+          typeof body === "string" ? body : JSON.stringify(body, null, 2);
+
+        setResult({
+          kind: "error",
+          text: `Registration failed (${status})\n\n${errText}`,
+        });
         return;
       }
 
       const accountId = body.accountId ?? body.defaultAccountId ?? "(unknown)";
-      setOutput(
-        `Registered successfully\n\nuserId: ${body.userId}\nemail: ${body.email}\naccountId: ${accountId}`
-      );
+
+      setResult({
+        kind: "success",
+        text: `Registration successful\n\nuserId: ${body.userId}\nemail: ${body.email}\naccountId: ${accountId}`,
+      });
 
       setEmail("");
       setPassword("");
     } catch (err) {
-      setOutput(`Network / server error\n\n${err?.message || String(err)}`);
+      setResult({
+        kind: "error",
+        text: `Network / server error\n\n${err?.message || String(err)}`,
+      });
     } finally {
       setLoading(false);
     }
@@ -67,7 +78,15 @@ export default function RegisterForm() {
         </Button>
       </form>
 
-      {output && <pre className="output">{output}</pre>}
+      {result && (
+        <pre
+          className={`output ${
+            result.kind === "error" ? "output--error" : "output--success"
+          }`}
+        >
+          {result.text}
+        </pre>
+      )}
     </>
   );
 }

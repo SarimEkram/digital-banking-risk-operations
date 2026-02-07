@@ -4,21 +4,27 @@
 
 .page {
   min-height: 100vh;
+  width: 100%;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: #0b1220;
+  background:
+    radial-gradient(900px 500px at 50% 25%, rgba(37, 99, 235, 0.18), transparent 60%),
+    radial-gradient(700px 420px at 15% 80%, rgba(59, 130, 246, 0.12), transparent 60%),
+    #0b1220;
   color: #e5e7eb;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
 .card {
   width: 100%;
-  max-width: 520px;
-  background: #0f1a30;
+  max-width: 560px;
+  background: rgba(15, 26, 48, 0.92);
   border: 1px solid #1f2a44;
   border-radius: 14px;
   padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
 }
 
 h1 {
@@ -32,12 +38,22 @@ h1 {
   font-size: 14px;
 }
 
+.form {
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
 .form label {
   display: grid;
   gap: 6px;
   margin: 12px 0;
   font-size: 13px;
   color: #cbd5e1;
+  width: 100%;
 }
 
 input {
@@ -47,11 +63,22 @@ input {
   border: 1px solid #24314f;
   background: #0b1220;
   color: #e5e7eb;
+  outline: none;
+}
+
+input:focus {
+  border-color: rgba(37, 99, 235, 0.9);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 button {
   margin-top: 14px;
   width: 100%;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+
   padding: 10px 12px;
   border-radius: 10px;
   border: 0;
@@ -59,6 +86,10 @@ button {
   color: white;
   font-weight: 700;
   cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.05);
 }
 
 button:disabled {
@@ -71,8 +102,20 @@ button:disabled {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #24314f;
-  background: #0b1220;
+  background: rgba(11, 18, 32, 0.9);
   white-space: pre-wrap;
   font-size: 13px;
   color: #d1d5db;
+
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.output--success {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.output--error {
+  border-color: rgba(239, 68, 68, 0.35);
 }
