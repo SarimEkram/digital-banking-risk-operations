@@ -2,6 +2,7 @@ package com.sarim.digitalbanking.auth;
 
 import com.sarim.digitalbanking.accounts.AccountEntity;
 import com.sarim.digitalbanking.accounts.AccountRepository;
+import com.sarim.digitalbanking.security.JwtService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -13,17 +14,21 @@ import java.util.Locale;
 public class AuthService {
 
     public record RegisterResult(Long userId, String email, Long accountId) {}
+    public record LoginResult(Long userId, String email, String role, String accessToken, long expiresInSeconds) {}
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public AuthService(UserRepository userRepository,
                        AccountRepository accountRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -37,7 +42,6 @@ public class AuthService {
             throw new IllegalArgumentException("Password must be at least 8 characters");
         }
 
-        // Fast pre-check
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalArgumentException("Email already registered");
         }
@@ -51,11 +55,9 @@ public class AuthService {
         try {
             savedUser = userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            // Handles race condition where two requests register same email at once
             throw new IllegalArgumentException("Email already registered");
         }
 
-        // Option A: auto-create default CAD account
         AccountEntity account = new AccountEntity();
         account.setUser(savedUser);
         account.setCurrency("CAD");
@@ -65,6 +67,32 @@ public class AuthService {
         AccountEntity savedAccount = accountRepository.save(account);
 
         return new RegisterResult(savedUser.getId(), savedUser.getEmail(), savedAccount.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResult login(String email, String rawPassword) {
+        String normalizedEmail = normalizeEmail(email);
+
+        UserEntity user = userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(InvalidCredentialsException::new);
+
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new InvalidCredentialsException();
+        }
+
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
+        }
+
+        String token = jwtService.createAccessToken(user);
+
+        return new LoginResult(
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name(),
+                token,
+                jwtService.getExpirationSeconds()
+        );
     }
 
     private String normalizeEmail(String email) {
