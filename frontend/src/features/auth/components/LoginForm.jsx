@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import TextField from "../../../shared/ui/TextField";
 import Button from "../../../shared/ui/Button";
-import { register } from "../api";
+import { login } from "../api";
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+} from "../../../shared/auth/token";
 
-export default function RegisterForm() {
-  const navigate = useNavigate();
-
+export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { kind: "success"|"error", text: string }
+  const [hasSavedToken, setHasSavedToken] = useState(Boolean(getAccessToken()));
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -19,7 +22,7 @@ export default function RegisterForm() {
     setResult(null);
 
     try {
-      const { ok, status, body } = await register({
+      const { ok, status, body } = await login({
         email: email.trim(),
         password,
       });
@@ -30,24 +33,34 @@ export default function RegisterForm() {
 
         setResult({
           kind: "error",
-          text: `Registration failed (${status})\n\n${errText}`,
+          text: `Login failed (${status})\n\n${errText}`,
         });
         return;
       }
 
-      const accountId = body.accountId ?? body.defaultAccountId ?? "(unknown)";
+      const token = body?.accessToken;
+      if (typeof token === "string" && token.length > 0) {
+        setAccessToken(token);
+        setHasSavedToken(true);
+      }
+
+      const tokenPreview =
+        typeof token === "string" && token.length > 0
+          ? `${token.slice(0, 24)}...`
+          : "(missing token)";
 
       setResult({
         kind: "success",
-        text: `Registration successful\n\nuserId: ${body.userId}\nemail: ${body.email}\naccountId: ${accountId}`,
+        text:
+          `Login successful\n\n` +
+          `userId: ${body.userId}\n` +
+          `email: ${body.email}\n` +
+          `role: ${body.role}\n` +
+          `token saved: ${typeof token === "string" && token.length > 0 ? "yes" : "no"}\n` +
+          `accessToken: ${tokenPreview}`,
       });
 
-      setEmail("");
       setPassword("");
-
-      // popup + redirect to login
-      window.alert("Registration successful. Please log in.");
-      navigate("/login", { replace: true });
     } catch (err) {
       setResult({
         kind: "error",
@@ -56,6 +69,12 @@ export default function RegisterForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function onLogout() {
+    clearAccessToken();
+    setHasSavedToken(false);
+    setResult(null);
   }
 
   return (
@@ -71,18 +90,23 @@ export default function RegisterForm() {
         />
 
         <TextField
-          label="Password (8+ chars)"
+          label="Password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={8}
           maxLength={72}
           required
         />
 
         <Button type="submit" disabled={loading}>
-          {loading ? "Registering..." : "Register"}
+          {loading ? "Signing in..." : "Login"}
         </Button>
+
+        {hasSavedToken && (
+          <Button type="button" disabled={loading} onClick={onLogout}>
+            Logout (clear token)
+          </Button>
+        )}
       </form>
 
       {result && (

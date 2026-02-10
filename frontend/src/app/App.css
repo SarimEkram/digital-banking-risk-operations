@@ -118,3 +118,19 @@ button:disabled {
 .output--error {
   border-color: rgba(239, 68, 68, 0.35);
 }
+
+.helper {
+  margin-top: 14px;
+  text-align: center;
+  color: #a8b3cf;
+  font-size: 13px;
+}
+
+.link {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
