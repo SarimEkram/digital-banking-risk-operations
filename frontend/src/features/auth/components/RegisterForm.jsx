@@ -35,7 +35,7 @@ export default function RegisterForm() {
         return;
       }
 
-      const accountId = body.accountId ?? body.defaultAccountId ?? "(unknown)";
+      const accountId = body.accountId ?? "(unknown)";
 
       setResult({
         kind: "success",
@@ -45,7 +45,6 @@ export default function RegisterForm() {
       setEmail("");
       setPassword("");
 
-      // popup + redirect to login
       window.alert("Registration successful. Please log in.");
       navigate("/login", { replace: true });
     } catch (err) {

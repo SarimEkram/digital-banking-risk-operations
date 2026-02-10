@@ -1,20 +1,18 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TextField from "../../../shared/ui/TextField";
 import Button from "../../../shared/ui/Button";
 import { login } from "../api";
-import {
-  clearAccessToken,
-  getAccessToken,
-  setAccessToken,
-} from "../../../shared/auth/token";
+import { clearAccessToken, setAccessToken } from "../../../shared/auth/token";
 
 export default function LoginForm() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { kind: "success"|"error", text: string }
-  const [hasSavedToken, setHasSavedToken] = useState(Boolean(getAccessToken()));
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -41,26 +39,19 @@ export default function LoginForm() {
       const token = body?.accessToken;
       if (typeof token === "string" && token.length > 0) {
         setAccessToken(token);
-        setHasSavedToken(true);
+        setResult({
+          kind: "success",
+          text: `Login successful\n\nredirecting to /home...`,
+        });
+        setPassword("");
+        navigate("/home", { replace: true });
+        return;
       }
 
-      const tokenPreview =
-        typeof token === "string" && token.length > 0
-          ? `${token.slice(0, 24)}...`
-          : "(missing token)";
-
       setResult({
-        kind: "success",
-        text:
-          `Login successful\n\n` +
-          `userId: ${body.userId}\n` +
-          `email: ${body.email}\n` +
-          `role: ${body.role}\n` +
-          `token saved: ${typeof token === "string" && token.length > 0 ? "yes" : "no"}\n` +
-          `accessToken: ${tokenPreview}`,
+        kind: "error",
+        text: "Login response missing accessToken",
       });
-
-      setPassword("");
     } catch (err) {
       setResult({
         kind: "error",
@@ -73,8 +64,7 @@ export default function LoginForm() {
 
   function onLogout() {
     clearAccessToken();
-    setHasSavedToken(false);
-    setResult(null);
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -102,11 +92,9 @@ export default function LoginForm() {
           {loading ? "Signing in..." : "Login"}
         </Button>
 
-        {hasSavedToken && (
-          <Button type="button" disabled={loading} onClick={onLogout}>
-            Logout (clear token)
-          </Button>
-        )}
+        <Button type="button" disabled={loading} onClick={onLogout}>
+          Logout (clear token)
+        </Button>
       </form>
 
       {result && (

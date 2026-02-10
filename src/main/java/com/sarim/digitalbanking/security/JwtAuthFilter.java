@@ -60,7 +60,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String email = claims.getSubject();
             String role = claims.get("role", String.class);
 
+            Number uidNum = claims.get("uid", Number.class);
+            Long uid = (uidNum == null) ? null : uidNum.longValue();
+
             if (email != null && !email.isBlank() && role != null && !role.isBlank()) {
+                // make uid/role available to controllers
+                if (uid != null) request.setAttribute("uid", uid);
+                request.setAttribute("role", role);
+
                 var auth = new UsernamePasswordAuthenticationToken(
                         email,
                         null,
@@ -69,7 +76,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         } catch (JwtException ignored) {
-            // invalid/expired token -> treat as unauthenticated
             SecurityContextHolder.clearContext();
         }
 
