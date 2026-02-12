@@ -1,0 +1,10 @@
+.card {
+  width: 100%;
+  max-width: 560px;
+  background: rgba(15, 26, 48, 0.92);
+  border: 1px solid #1f2a44;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}

@@ -4,6 +4,7 @@ import TextField from "../../../shared/ui/TextField";
 import Button from "../../../shared/ui/Button";
 import { login } from "../api";
 import { clearAccessToken, setAccessToken } from "../../../shared/auth/token";
+import styles from "../../../styles/AuthForm.module.css";
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null); // { kind: "success"|"error", text: string }
+  const [result, setResult] = useState(null);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -26,37 +27,23 @@ export default function LoginForm() {
       });
 
       if (!ok) {
-        const errText =
-          typeof body === "string" ? body : JSON.stringify(body, null, 2);
-
-        setResult({
-          kind: "error",
-          text: `Login failed (${status})\n\n${errText}`,
-        });
+        const errText = typeof body === "string" ? body : JSON.stringify(body, null, 2);
+        setResult({ kind: "error", text: `Login failed (${status})\n\n${errText}` });
         return;
       }
 
       const token = body?.accessToken;
       if (typeof token === "string" && token.length > 0) {
         setAccessToken(token);
-        setResult({
-          kind: "success",
-          text: `Login successful\n\nredirecting to /home...`,
-        });
+        setResult({ kind: "success", text: `Login successful\n\nredirecting to /home...` });
         setPassword("");
         navigate("/home", { replace: true });
         return;
       }
 
-      setResult({
-        kind: "error",
-        text: "Login response missing accessToken",
-      });
+      setResult({ kind: "error", text: "Login response missing accessToken" });
     } catch (err) {
-      setResult({
-        kind: "error",
-        text: `Network / server error\n\n${err?.message || String(err)}`,
-      });
+      setResult({ kind: "error", text: `Network / server error\n\n${err?.message || String(err)}` });
     } finally {
       setLoading(false);
     }
@@ -69,7 +56,7 @@ export default function LoginForm() {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form">
+      <form onSubmit={onSubmit} className={styles.form}>
         <TextField
           label="Email"
           type="email"
@@ -99,8 +86,8 @@ export default function LoginForm() {
 
       {result && (
         <pre
-          className={`output ${
-            result.kind === "error" ? "output--error" : "output--success"
+          className={`${styles.output} ${
+            result.kind === "error" ? styles.outputError : styles.outputSuccess
           }`}
         >
           {result.text}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import TextField from "../../../shared/ui/TextField";
 import Button from "../../../shared/ui/Button";
 import { register } from "../api";
+import styles from "../../../styles/AuthForm.module.css";
 
 export default function RegisterForm() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function RegisterForm() {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null); // { kind: "success"|"error", text: string }
+  const [result, setResult] = useState(null);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -25,18 +26,12 @@ export default function RegisterForm() {
       });
 
       if (!ok) {
-        const errText =
-          typeof body === "string" ? body : JSON.stringify(body, null, 2);
-
-        setResult({
-          kind: "error",
-          text: `Registration failed (${status})\n\n${errText}`,
-        });
+        const errText = typeof body === "string" ? body : JSON.stringify(body, null, 2);
+        setResult({ kind: "error", text: `Registration failed (${status})\n\n${errText}` });
         return;
       }
 
       const accountId = body.accountId ?? "(unknown)";
-
       setResult({
         kind: "success",
         text: `Registration successful\n\nuserId: ${body.userId}\nemail: ${body.email}\naccountId: ${accountId}`,
@@ -48,10 +43,7 @@ export default function RegisterForm() {
       window.alert("Registration successful. Please log in.");
       navigate("/login", { replace: true });
     } catch (err) {
-      setResult({
-        kind: "error",
-        text: `Network / server error\n\n${err?.message || String(err)}`,
-      });
+      setResult({ kind: "error", text: `Network / server error\n\n${err?.message || String(err)}` });
     } finally {
       setLoading(false);
     }
@@ -59,7 +51,7 @@ export default function RegisterForm() {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form">
+      <form onSubmit={onSubmit} className={styles.form}>
         <TextField
           label="Email"
           type="email"
@@ -86,8 +78,8 @@ export default function RegisterForm() {
 
       {result && (
         <pre
-          className={`output ${
-            result.kind === "error" ? "output--error" : "output--success"
+          className={`${styles.output} ${
+            result.kind === "error" ? styles.outputError : styles.outputSuccess
           }`}
         >
           {result.text}

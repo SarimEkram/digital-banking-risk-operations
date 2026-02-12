@@ -1,4 +1,3 @@
-import "./App.css";
 import { Navigate, Route, Routes } from "react-router-dom";
 import RegisterPage from "../features/auth/RegisterPage.jsx";
 import LoginPage from "../features/auth/LoginPage.jsx";

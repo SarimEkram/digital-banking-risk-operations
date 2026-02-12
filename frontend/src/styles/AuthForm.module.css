@@ -1,0 +1,78 @@
+.form {
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.form label {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.form input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #24314f;
+  background: #0b1220;
+  color: #e5e7eb;
+  outline: none;
+}
+
+.form input:focus {
+  border-color: rgba(37, 99, 235, 0.9);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.form button {
+  margin-top: 14px;
+  width: 100%;
+  max-width: 360px;
+  display: block;
+
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 0;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form button:hover {
+  filter: brightness(1.05);
+}
+
+.form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.output {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #24314f;
+  background: rgba(11, 18, 32, 0.9);
+  white-space: pre-wrap;
+  font-size: 13px;
+  color: #d1d5db;
+
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.outputSuccess {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.outputError {
+  border-color: rgba(239, 68, 68, 0.35);
+}

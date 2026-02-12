@@ -1,0 +1,228 @@
+.page {
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 500px at 50% 25%, rgba(37, 99, 235, 0.18), transparent 60%),
+    radial-gradient(700px 420px at 15% 80%, rgba(59, 130, 246, 0.12), transparent 60%),
+    #0b1220;
+  color: #e5e7eb;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.cardWide {
+  width: 100%;
+  max-width: 860px;
+}
+
+.dashTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.dashTitle {
+  margin: 0 0 6px;
+  font-size: 22px;
+  letter-spacing: 0.2px;
+}
+
+.sub {
+  margin: 0 0 18px;
+  color: #a8b3cf;
+  font-size: 14px;
+}
+
+.dashActions {
+  display: grid;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.dashGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+@media (min-width: 860px) {
+  .dashGrid {
+    grid-template-columns: 320px 1fr;
+    align-items: start;
+  }
+
+  .panelWide {
+    grid-column: auto;
+  }
+}
+
+.panel {
+  border: 1px solid #1f2a44;
+  background: rgba(11, 18, 32, 0.55);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+}
+
+.panelSub {
+  color: #a8b3cf;
+  font-size: 12px;
+}
+
+.kv {
+  display: grid;
+  gap: 10px;
+}
+
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kvKey {
+  color: #a8b3cf;
+  font-size: 12px;
+}
+
+.kvVal {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #24314f;
+  font-size: 12px;
+  color: #d1d5db;
+  background: rgba(15, 26, 48, 0.6);
+}
+
+.pillUser {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.pillAdmin {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.pillGood {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.pillWarn {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.pillBad {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #a8b3cf;
+  line-height: 1.35;
+}
+
+.acctList {
+  display: grid;
+  gap: 10px;
+}
+
+.acctRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #1f2a44;
+  background: rgba(15, 26, 48, 0.55);
+}
+
+.acctMain {
+  display: grid;
+  gap: 6px;
+}
+
+.acctName {
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.acctMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #a8b3cf;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 99px;
+  background: #2b3a5f;
+  display: inline-block;
+}
+
+.acctBal {
+  text-align: right;
+  min-width: 160px;
+}
+
+.acctBalLabel {
+  color: #a8b3cf;
+  font-size: 12px;
+}
+
+.acctBalValue {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.divider {
+  margin: 14px 0;
+  height: 1px;
+  background: #1f2a44;
+  opacity: 0.9;
+}
+
+.ctaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ctaTitle {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
