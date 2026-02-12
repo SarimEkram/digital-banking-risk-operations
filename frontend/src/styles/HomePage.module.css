@@ -1,70 +1,90 @@
 .page {
   min-height: 100vh;
   width: 100%;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 56px 24px;
+
   background:
-    radial-gradient(900px 500px at 50% 25%, rgba(37, 99, 235, 0.18), transparent 60%),
-    radial-gradient(700px 420px at 15% 80%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(900px 520px at 50% 20%, rgba(37, 99, 235, 0.20), transparent 60%),
+    radial-gradient(760px 520px at 20% 85%, rgba(59, 130, 246, 0.12), transparent 60%),
     #0b1220;
+
   color: #e5e7eb;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-.cardWide {
-  width: 100%;
-  max-width: 860px;
+.dashboardCard {
+  width: 100% !important;
+  max-width: 1040px !important;
+  padding: 28px !important;
+  border-radius: 18px !important;
+  position: relative;
+  overflow: hidden;
 }
 
-.dashTop {
+.dashboardCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(600px 260px at 15% 0%, rgba(37, 99, 235, 0.18), transparent 60%),
+    radial-gradient(520px 280px at 95% 30%, rgba(59, 130, 246, 0.10), transparent 60%);
+  pointer-events: none;
+}
+
+.dashboardInner {
+  position: relative;
+  z-index: 1;
+}
+
+.header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
-.dashTitle {
+.title {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 24px;
   letter-spacing: 0.2px;
 }
 
 .sub {
-  margin: 0 0 18px;
+  margin: 0;
   color: #a8b3cf;
   font-size: 14px;
 }
 
-.dashActions {
+.actions {
   display: grid;
   gap: 10px;
   min-width: 180px;
 }
 
-.dashGrid {
+.grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  margin-top: 10px;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  align-items: start;
 }
 
-@media (min-width: 860px) {
-  .dashGrid {
-    grid-template-columns: 320px 1fr;
-    align-items: start;
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
   }
-
-  .panelWide {
-    grid-column: auto;
+  .actions {
+    min-width: 0;
   }
 }
 
 .panel {
   border: 1px solid #1f2a44;
   background: rgba(11, 18, 32, 0.55);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 14px;
 }
 
@@ -78,7 +98,7 @@
 
 .panelTitle {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: 0.2px;
 }
 
@@ -151,6 +171,33 @@
   line-height: 1.35;
 }
 
+.balanceHero {
+  border: 1px solid #1f2a44;
+  background: rgba(15, 26, 48, 0.55);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.balanceLabel {
+  font-size: 12px;
+  color: #a8b3cf;
+  margin-bottom: 6px;
+}
+
+.balanceValue {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.divider {
+  margin: 14px 0;
+  height: 1px;
+  background: #1f2a44;
+  opacity: 0.9;
+}
+
 .acctList {
   display: grid;
   gap: 10px;
@@ -162,9 +209,13 @@
   justify-content: space-between;
   gap: 14px;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid #1f2a44;
   background: rgba(15, 26, 48, 0.55);
+}
+
+.acctRow:hover {
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 .acctMain {
@@ -187,14 +238,14 @@
 .dot {
   width: 4px;
   height: 4px;
-  border-radius: 99px;
+  border-radius: 999px;
   background: #2b3a5f;
   display: inline-block;
 }
 
 .acctBal {
   text-align: right;
-  min-width: 160px;
+  min-width: 170px;
 }
 
 .acctBalLabel {
@@ -208,13 +259,6 @@
   letter-spacing: 0.2px;
 }
 
-.divider {
-  margin: 14px 0;
-  height: 1px;
-  background: #1f2a44;
-  opacity: 0.9;
-}
-
 .ctaRow {
   display: flex;
   align-items: center;
@@ -225,4 +269,19 @@
 .ctaTitle {
   margin: 0 0 6px;
   font-size: 14px;
+}
+
+.output {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #24314f;
+  background: rgba(11, 18, 32, 0.9);
+  white-space: pre-wrap;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.outputError {
+  border-color: rgba(239, 68, 68, 0.35);
 }
