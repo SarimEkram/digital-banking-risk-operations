@@ -11,6 +11,11 @@ create table if not exists users (
 create table if not exists accounts (
   id bigserial primary key,
   user_id bigint not null references users(id) on delete restrict,
+
+  -- NEW: account type (savings comes later, but we support the type now)
+  account_type text not null default 'CHEQUING'
+    check (account_type in ('CHEQUING','SAVINGS')),
+
   currency varchar(3) not null default 'CAD',
   balance_cents bigint not null default 0,
   status text not null default 'ACTIVE' check (status in ('ACTIVE','FROZEN','CLOSED')),
@@ -19,6 +24,10 @@ create table if not exists accounts (
 );
 
 create index if not exists idx_accounts_user_id on accounts(user_id);
+
+-- NEW: enforce max 1 account per (user, type)
+create unique index if not exists uq_accounts_user_id_account_type
+  on accounts(user_id, account_type);
 
 create table if not exists transfers (
   id bigserial primary key,
@@ -74,4 +83,5 @@ create table if not exists audit_log (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_audit_actor_created_at on audit_log(actor_user_id, created_at);
+create index if not exists idx_audit_actor_created_at
+  on audit_log(actor_user_id, created_at);

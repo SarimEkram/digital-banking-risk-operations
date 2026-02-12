@@ -41,6 +41,7 @@ public class AccountsController {
     private AccountResponse toResponse(AccountEntity a) {
         return new AccountResponse(
                 a.getId(),
+                a.getAccountType(),
                 a.getCurrency(),
                 a.getBalanceCents(),
                 a.getStatus()

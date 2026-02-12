@@ -2,6 +2,7 @@ package com.sarim.digitalbanking.auth;
 
 import com.sarim.digitalbanking.accounts.AccountEntity;
 import com.sarim.digitalbanking.accounts.AccountRepository;
+import com.sarim.digitalbanking.accounts.AccountType;
 import com.sarim.digitalbanking.security.JwtService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -61,6 +62,7 @@ public class AuthService {
         AccountEntity account = new AccountEntity();
         account.setUser(savedUser);
         account.setCurrency("CAD");
+        account.setAccountType(AccountType.CHEQUING);
         account.setBalanceCents(0L);
         account.setStatus("ACTIVE");
 

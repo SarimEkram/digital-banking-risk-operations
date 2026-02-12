@@ -21,6 +21,10 @@ public class AccountEntity {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "CAD";
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false)
+    private AccountType accountType = AccountType.CHEQUING;
+
     @Column(name = "balance_cents", nullable = false)
     private long balanceCents = 0L;
 
@@ -43,6 +47,9 @@ public class AccountEntity {
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+
+    public AccountType getAccountType() { return accountType; }
+    public void setAccountType(AccountType accountType) { this.accountType = accountType; }
 
     public long getBalanceCents() { return balanceCents; }
     public void setBalanceCents(long balanceCents) { this.balanceCents = balanceCents; }
