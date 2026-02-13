@@ -1,0 +1,85 @@
+.shell {
+  min-height: 100vh;
+}
+
+.topNav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid rgba(31, 42, 68, 0.8);
+  background: rgba(11, 18, 32, 0.65);
+  backdrop-filter: blur(10px);
+}
+
+.topNavInner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.brand {
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+}
+
+.brandName {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.brandSub {
+  font-size: 12px;
+  color: #a8b3cf;
+}
+
+.navLinks {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 1;
+}
+
+.navLink {
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #cbd5e1;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+}
+
+.navLink:hover {
+  background: rgba(15, 26, 48, 0.55);
+  border-color: rgba(31, 42, 68, 0.9);
+}
+
+.navLinkActive {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #e5e7eb;
+}
+
+.logoutBtn {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(31, 42, 68, 0.9);
+  background: rgba(15, 26, 48, 0.75);
+  color: #e5e7eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.logoutBtn:hover {
+  filter: brightness(1.05);
+}
+
+.main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 22px 18px 40px;
+}
