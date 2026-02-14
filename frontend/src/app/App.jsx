@@ -28,10 +28,10 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/transfer" element={<TransferPage />} />
-        <Route path="/payees" element={<PayeesPage />} />
-        <Route path="/activity" element={<ActivityPage />} />
+        <Route path="home" element={<HomePage />} />
+        <Route path="transfer" element={<TransferPage />} />
+        <Route path="payees" element={<PayeesPage />} />
+        <Route path="activity" element={<ActivityPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
