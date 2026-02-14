@@ -87,11 +87,6 @@ export default function HomePage() {
               <h1 className={styles.title}>{title}</h1>
               <p className={styles.sub}>Your dashboard: profile and accounts.</p>
             </div>
-
-            <div className={styles.actions}>
-              <h1 className={styles.title}>{title}</h1>
-               <p className={styles.sub}>Your dashboard: profile and accounts.</p>
-            </div>
           </div>
 
           {loading && <p className={styles.sub}>Loading your dashboard...</p>}
