@@ -17,4 +17,12 @@ public interface AccountRepository extends JpaRepository<AccountEntity, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AccountEntity a where a.id in :ids")
     List<AccountEntity> findByIdInForUpdate(@Param("ids") List<Long> ids);
+
+    // Rule A helper (for later transfer-by-payee-email): payee's ACTIVE CHEQUING account in a currency
+    Optional<AccountEntity> findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(
+            Long userId,
+            AccountType accountType,
+            String currency,
+            String status
+    );
 }
