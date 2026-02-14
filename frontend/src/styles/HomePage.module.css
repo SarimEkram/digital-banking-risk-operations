@@ -48,11 +48,6 @@
   font-size: 14px;
 }
 
-.actions {
-  display: grid;
-  gap: 10px;
-  min-width: 180px;
-}
 
 .grid {
   display: grid;
@@ -64,9 +59,6 @@
 @media (max-width: 900px) {
   .grid {
     grid-template-columns: 1fr;
-  }
-  .actions {
-    min-width: 0;
   }
 }
 
