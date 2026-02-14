@@ -1,6 +1,7 @@
 package com.sarim.digitalbanking.common;
 
 import com.sarim.digitalbanking.auth.InvalidCredentialsException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,4 +32,9 @@ public class ApiExceptionHandler {
                 .body(Map.of("error", "missing Idempotency-Key"));
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> conflict(DataIntegrityViolationException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "conflict"));
+    }
 }
