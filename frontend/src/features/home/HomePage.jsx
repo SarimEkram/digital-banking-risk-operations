@@ -77,10 +77,6 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function onLogout() {
-    clearAccessToken();
-    navigate("/login", { replace: true });
-  }
 
   return (
     <div className={styles.page}>
