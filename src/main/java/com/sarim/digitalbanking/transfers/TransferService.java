@@ -2,6 +2,7 @@ package com.sarim.digitalbanking.transfers;
 
 import com.sarim.digitalbanking.accounts.AccountEntity;
 import com.sarim.digitalbanking.accounts.AccountRepository;
+import com.sarim.digitalbanking.accounts.AccountType;
 import com.sarim.digitalbanking.audit.AuditLogEntity;
 import com.sarim.digitalbanking.audit.AuditLogRepository;
 import com.sarim.digitalbanking.auth.UserEntity;
@@ -9,13 +10,14 @@ import com.sarim.digitalbanking.auth.UserRepository;
 import com.sarim.digitalbanking.ledger.LedgerDirection;
 import com.sarim.digitalbanking.ledger.LedgerEntryEntity;
 import com.sarim.digitalbanking.ledger.LedgerEntryRepository;
+import com.sarim.digitalbanking.payees.PayeeEntity;
+import com.sarim.digitalbanking.payees.PayeeRepository;
 import com.sarim.digitalbanking.transfers.api.CreateTransferRequest;
 import com.sarim.digitalbanking.transfers.api.TransferResponse;
+import jakarta.persistence.EntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import jakarta.persistence.EntityManager;
-
 
 import java.util.Comparator;
 import java.util.List;
@@ -28,8 +30,8 @@ public class TransferService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final PayeeRepository payeeRepository;
     private final EntityManager entityManager;
-
 
     public TransferService(
             AccountRepository accountRepository,
@@ -37,6 +39,7 @@ public class TransferService {
             LedgerEntryRepository ledgerEntryRepository,
             AuditLogRepository auditLogRepository,
             UserRepository userRepository,
+            PayeeRepository payeeRepository,
             EntityManager entityManager
     ) {
         this.accountRepository = accountRepository;
@@ -44,19 +47,15 @@ public class TransferService {
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
+        this.payeeRepository = payeeRepository;
         this.entityManager = entityManager;
     }
-
 
     @Transactional
     public TransferResponse createTransfer(Long actorUserId, String idempotencyKey, CreateTransferRequest req) {
         var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             return toResponse(existing.get());
-        }
-
-        if (req.fromAccountId().equals(req.toAccountId())) {
-            throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
         }
 
         String currency = (req.currency() == null || req.currency().isBlank())
@@ -69,7 +68,33 @@ public class TransferService {
 
         long amount = req.amountCents();
 
-        List<Long> ids = List.of(req.fromAccountId(), req.toAccountId()).stream()
+        // 1) resolve payeeId -> payee row (must belong to the current user)
+        PayeeEntity payee = payeeRepository.findByIdAndOwnerUser_Id(req.payeeId(), actorUserId)
+                .orElseThrow(() -> new IllegalArgumentException("payee not found"));
+
+        if (!"ACTIVE".equalsIgnoreCase(payee.getStatus())) {
+            throw new IllegalArgumentException("payee is disabled");
+        }
+
+        Long payeeUserId = payee.getPayeeUser().getId();
+
+        // 2) find payee’s ACTIVE CHEQUING in the requested currency
+        Long toAccountId = accountRepository
+                .findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(
+                        payeeUserId,
+                        AccountType.CHEQUING,
+                        currency,
+                        "ACTIVE"
+                )
+                .map(AccountEntity::getId)
+                .orElseThrow(() -> new IllegalArgumentException("payee account not found"));
+
+        if (req.fromAccountId().equals(toAccountId)) {
+            throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
+        }
+
+        // 3) lock both accounts
+        List<Long> ids = List.of(req.fromAccountId(), toAccountId).stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
 
@@ -79,9 +104,13 @@ public class TransferService {
         }
 
         AccountEntity from = locked.get(0).getId().equals(req.fromAccountId()) ? locked.get(0) : locked.get(1);
-        AccountEntity to   = locked.get(0).getId().equals(req.toAccountId())   ? locked.get(0) : locked.get(1);
+        AccountEntity to   = locked.get(0).getId().equals(toAccountId)          ? locked.get(0) : locked.get(1);
 
+        // 4) ownership + safety checks
         if (!from.getUser().getId().equals(actorUserId)) {
+            throw new IllegalArgumentException("Account not found");
+        }
+        if (!to.getUser().getId().equals(payeeUserId)) {
             throw new IllegalArgumentException("Account not found");
         }
 
@@ -100,6 +129,7 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient funds");
         }
 
+        // 5) create transfer + ledger entries + balances
         TransferEntity t = new TransferEntity();
         t.setFromAccount(from);
         t.setToAccount(to);
@@ -145,7 +175,11 @@ public class TransferService {
         log.setAction("TRANSFER_CREATE");
         log.setEntityType("transfer");
         log.setEntityId(String.valueOf(t.getId()));
-        log.setDetails("from=" + from.getId() + ", to=" + to.getId() + ", amount_cents=" + amount + ", currency=" + currency);
+        log.setDetails("from=" + from.getId()
+                + ", payee_id=" + payee.getId()
+                + ", to=" + to.getId()
+                + ", amount_cents=" + amount
+                + ", currency=" + currency);
 
         auditLogRepository.save(log);
 

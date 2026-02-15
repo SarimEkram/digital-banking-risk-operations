@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 public record CreateTransferRequest(
         @NotNull Long fromAccountId,
-        @NotNull Long toAccountId,
+        @NotNull Long payeeId,
         @NotNull @Positive Long amountCents,
         @Size(min = 3, max = 3) String currency
 ) {}

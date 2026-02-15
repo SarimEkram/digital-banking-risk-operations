@@ -7,6 +7,7 @@ import TextField from "../../shared/ui/TextField";
 
 import { clearAccessToken } from "../../shared/auth/token";
 import { getAccounts } from "../home/api";
+import { listPayees } from "../payees/api";
 import { createTransfer } from "./api";
 
 import styles from "../../styles/TransferPage.module.css";
@@ -23,8 +24,6 @@ function formatMoney(cents, currency = "CAD") {
 function parseMoneyToCents(input) {
   const v = String(input ?? "").trim();
   if (!v) return null;
-
-  // allow "10", "10.5", "10.50"
   if (!/^\d+(\.\d{0,2})?$/.test(v)) return null;
 
   const [whole, fracRaw = ""] = v.split(".");
@@ -34,8 +33,7 @@ function parseMoneyToCents(input) {
 }
 
 function makeIdempotencyKey() {
-  const uuid =
-    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : null;
+  const uuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : null;
   return `web-${uuid ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
 }
 
@@ -44,8 +42,10 @@ export default function TransferPage() {
 
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
+  const [payees, setPayees] = useState([]);
+
   const [fromAccountId, setFromAccountId] = useState("");
-  const [toAccountId, setToAccountId] = useState("");
+  const [toPayeeId, setToPayeeId] = useState("");
   const [amount, setAmount] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -58,35 +58,58 @@ export default function TransferPage() {
     return accounts.find((a) => Number(a.id) === idNum) || null;
   }, [accounts, fromAccountId]);
 
-  async function loadAccounts() {
+    const selectedPayee = useMemo(() => {
+      const idNum = Number(toPayeeId);
+      return payees.find((p) => Number(p.id) === idNum) || null;
+    }, [payees, toPayeeId]);
+
+
+  async function loadData() {
     setLoading(true);
     setError("");
 
-    const res = await getAccounts();
-    if (!res.ok && res.status === 401) {
-      clearAccessToken();
-      navigate("/login", { replace: true });
-      return;
+    const [acctRes, payeeRes] = await Promise.all([getAccounts(), listPayees()]);
+
+    for (const res of [acctRes, payeeRes]) {
+      if (!res.ok && res.status === 401) {
+        clearAccessToken();
+        navigate("/login", { replace: true });
+        return;
+      }
     }
-    if (!res.ok) {
-      const errText = typeof res.body === "string" ? res.body : JSON.stringify(res.body, null, 2);
-      setError(`Failed to load /api/accounts (${res.status})\n\n${errText}`);
+
+    if (!acctRes.ok) {
+      const errText = typeof acctRes.body === "string" ? acctRes.body : JSON.stringify(acctRes.body, null, 2);
+      setError(`Failed to load /api/accounts (${acctRes.status})\n\n${errText}`);
       setLoading(false);
       return;
     }
 
-    const list = Array.isArray(res.body) ? res.body : [];
-    setAccounts(list);
+    if (!payeeRes.ok) {
+      const errText = typeof payeeRes.body === "string" ? payeeRes.body : JSON.stringify(payeeRes.body, null, 2);
+      setError(`Failed to load /api/payees (${payeeRes.status})\n\n${errText}`);
+      setLoading(false);
+      return;
+    }
 
-    if (!fromAccountId && list.length > 0) {
-      setFromAccountId(String(list[0].id));
+    const acctList = Array.isArray(acctRes.body) ? acctRes.body : [];
+    const payeeList = Array.isArray(payeeRes.body) ? payeeRes.body : [];
+
+    setAccounts(acctList);
+    setPayees(payeeList);
+
+    if (!fromAccountId && acctList.length > 0) {
+      setFromAccountId(String(acctList[0].id));
+    }
+    if (!toPayeeId && payeeList.length > 0) {
+      setToPayeeId(String(payeeList[0].id));
     }
 
     setLoading(false);
   }
 
   useEffect(() => {
-    loadAccounts();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,19 +119,15 @@ export default function TransferPage() {
     setResult(null);
 
     const fromId = Number(fromAccountId);
-    const toId = Number(toAccountId);
+    const payeeIdNum = Number(toPayeeId);
     const amountCents = parseMoneyToCents(amount);
 
     if (!Number.isFinite(fromId) || fromId <= 0) {
       setError("Pick a valid From account.");
       return;
     }
-    if (!Number.isFinite(toId) || toId <= 0) {
-      setError("Enter a valid To account id.");
-      return;
-    }
-    if (fromId === toId) {
-      setError("From and To accounts must be different.");
+    if (!Number.isFinite(payeeIdNum) || payeeIdNum <= 0) {
+      setError("Pick a valid Payee.");
       return;
     }
     if (amountCents == null) {
@@ -116,12 +135,24 @@ export default function TransferPage() {
       return;
     }
 
+        if (!selectedPayee) {
+          setError("Pick a valid Payee.");
+          return;
+        }
+
+        const ok = window.confirm(
+          `Confirm transfer\n\nTo: ${selectedPayee.email}\nAmount: ${formatMoney(amountCents, "CAD")}`
+        );
+
+        if (!ok) return;
+
+
     const key = makeIdempotencyKey();
     setLastKey(key);
     setSubmitting(true);
 
     const res = await createTransfer(
-      { fromAccountId: fromId, toAccountId: toId, amountCents, currency: "CAD" },
+      { fromAccountId: fromId, payeeId: payeeIdNum, amountCents, currency: "CAD" },
       key
     );
 
@@ -139,7 +170,7 @@ export default function TransferPage() {
     }
 
     setResult(res.body);
-    await loadAccounts();
+    await loadData();
     setSubmitting(false);
   }
 
@@ -149,13 +180,11 @@ export default function TransferPage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.title}>Transfer</h1>
-            <p className={styles.sub}>
-              Send money using an idempotent backend call (Idempotency-Key required).
-            </p>
+            <p className={styles.sub}>Send money to an active payee (Idempotency-Key required).</p>
           </div>
         </div>
 
-        {loading && <p className={styles.sub}>Loading accounts...</p>}
+        {loading && <p className={styles.sub}>Loading accounts and payees...</p>}
 
         {!loading && (
           <div className={styles.grid}>
@@ -176,21 +205,32 @@ export default function TransferPage() {
                     ) : (
                       accounts.map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.id} • {a.accountType} • {formatMoney(a.balanceCents, a.currency)}
+                          {a.accountType} • {formatMoney(a.balanceCents, a.currency)}
                         </option>
                       ))
                     )}
                   </select>
                 </label>
 
-                <TextField
-                  label="To account id"
-                  placeholder="e.g. 4"
-                  inputMode="numeric"
-                  value={toAccountId}
-                  onChange={(e) => setToAccountId(e.target.value)}
-                  disabled={submitting}
-                />
+                <label className={styles.label}>
+                  <span className={styles.labelText}>To payee</span>
+                  <select
+                    className={styles.select}
+                    value={toPayeeId}
+                    onChange={(e) => setToPayeeId(e.target.value)}
+                    disabled={submitting || payees.length === 0}
+                  >
+                    {payees.length === 0 ? (
+                      <option value="">No payees yet</option>
+                    ) : (
+                      payees.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.email}{p.label ? ` (${p.label})` : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
 
                 <TextField
                   label="Amount (CAD)"
@@ -208,11 +248,17 @@ export default function TransferPage() {
                 )}
 
                 <div className={styles.actions}>
-                  <Button type="submit" disabled={submitting || accounts.length === 0}>
+                  <Button type="submit" disabled={submitting || accounts.length === 0 || payees.length === 0}>
                     {submitting ? "Sending..." : "Send transfer"}
                   </Button>
                 </div>
               </form>
+
+              {payees.length === 0 && (
+                <p className={styles.hint}>
+                  Add a payee first, then come back here to send money.
+                </p>
+              )}
 
               {lastKey && (
                 <p className={styles.hint}>
@@ -234,8 +280,8 @@ export default function TransferPage() {
                   {accounts.map((a) => (
                     <div className={styles.acctRow} key={a.id}>
                       <div>
-                        <div className={styles.mono}>Account • {a.id}</div>
-                        <div className={styles.subSmall}>{a.accountType} • {a.status} • {a.currency}</div>
+                        <div className={styles.mono}>{a.accountType}</div>
+                        <div className={styles.subSmall}>{a.status} • {a.currency}</div>
                       </div>
                       <div className={styles.right}>
                         <div className={styles.subSmall}>Available</div>
@@ -245,10 +291,6 @@ export default function TransferPage() {
                   ))}
                 </div>
               )}
-
-              <p className={styles.hint}>
-                For now, you need the recipient’s account id. Later we’ll replace this with Payees.
-              </p>
             </section>
           </div>
         )}
