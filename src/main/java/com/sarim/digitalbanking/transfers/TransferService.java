@@ -16,8 +16,10 @@ import com.sarim.digitalbanking.transfers.api.CreateTransferRequest;
 import com.sarim.digitalbanking.transfers.api.TransferResponse;
 import jakarta.persistence.EntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -53,11 +55,6 @@ public class TransferService {
 
     @Transactional
     public TransferResponse createTransfer(Long actorUserId, String idempotencyKey, CreateTransferRequest req) {
-        var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
-        if (existing.isPresent()) {
-            return toResponse(existing.get());
-        }
-
         String currency = (req.currency() == null || req.currency().isBlank())
                 ? "CAD"
                 : req.currency().trim().toUpperCase();
@@ -91,6 +88,27 @@ public class TransferService {
 
         if (req.fromAccountId().equals(toAccountId)) {
             throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
+        }
+
+        //  idempotency check
+        var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            TransferEntity t = existing.get();
+
+            boolean same =
+                    t.getFromAccount().getId().equals(req.fromAccountId()) &&
+                            t.getToAccount().getId().equals(toAccountId) &&
+                            t.getAmountCents() == amount &&
+                            t.getCurrency().equalsIgnoreCase(currency);
+
+            if (!same) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Idempotency-Key was already used with a different request"
+                );
+            }
+
+            return toResponse(t);
         }
 
         // 3) lock both accounts
@@ -142,6 +160,7 @@ public class TransferService {
             t = transferRepository.saveAndFlush(t);
             entityManager.refresh(t);
         } catch (DataIntegrityViolationException dup) {
+            // if another request with same idempotency key won the race, return that one
             return transferRepository.findByIdempotencyKey(idempotencyKey)
                     .map(this::toResponse)
                     .orElseThrow(() -> dup);

@@ -5,6 +5,7 @@ export function createTransfer({ fromAccountId, payeeId, amountCents, currency }
     method: "POST",
     headers: {
       "Idempotency-Key": idempotencyKey,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ fromAccountId, payeeId, amountCents, currency }),
   });

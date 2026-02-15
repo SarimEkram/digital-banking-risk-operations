@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Card from "../../shared/ui/Card";
@@ -53,16 +53,35 @@ export default function TransferPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
+  // IMPORTANT: idempotency key must be stable for the same "draft transfer"
+  // useRef so it updates synchronously (state can lag during fast double-submit).
+  const draftIdemKeyRef = useRef("");
+
   const fromAccount = useMemo(() => {
     const idNum = Number(fromAccountId);
     return accounts.find((a) => Number(a.id) === idNum) || null;
   }, [accounts, fromAccountId]);
 
-    const selectedPayee = useMemo(() => {
-      const idNum = Number(toPayeeId);
-      return payees.find((p) => Number(p.id) === idNum) || null;
-    }, [payees, toPayeeId]);
+  const selectedPayee = useMemo(() => {
+    const idNum = Number(toPayeeId);
+    return payees.find((p) => Number(p.id) === idNum) || null;
+  }, [payees, toPayeeId]);
 
+  // If user edits the transfer details, this is a *new* intent → new idempotency key.
+  useEffect(() => {
+    draftIdemKeyRef.current = "";
+  }, [fromAccountId, toPayeeId, amount]);
+
+  function getOrCreateDraftIdemKey() {
+    if (!draftIdemKeyRef.current) {
+      draftIdemKeyRef.current = makeIdempotencyKey();
+    }
+    return draftIdemKeyRef.current;
+  }
+
+  function clearDraftIdemKey() {
+    draftIdemKeyRef.current = "";
+  }
 
   async function loadData() {
     setLoading(true);
@@ -134,21 +153,20 @@ export default function TransferPage() {
       setError("Enter a valid amount like 10 or 10.50.");
       return;
     }
+    if (!selectedPayee) {
+      setError("Pick a valid Payee.");
+      return;
+    }
 
-        if (!selectedPayee) {
-          setError("Pick a valid Payee.");
-          return;
-        }
+    const ok = window.confirm(
+      `Confirm transfer\n\nTo: ${selectedPayee.email}\nAmount: ${formatMoney(amountCents, "CAD")}`
+    );
+    if (!ok) return;
 
-        const ok = window.confirm(
-          `Confirm transfer\n\nTo: ${selectedPayee.email}\nAmount: ${formatMoney(amountCents, "CAD")}`
-        );
-
-        if (!ok) return;
-
-
-    const key = makeIdempotencyKey();
+    // KEY CHANGE: reuse the same key for retries of the same intent
+    const key = getOrCreateDraftIdemKey();
     setLastKey(key);
+
     setSubmitting(true);
 
     const res = await createTransfer(
@@ -166,12 +184,17 @@ export default function TransferPage() {
       const errText = typeof res.body === "string" ? res.body : JSON.stringify(res.body, null, 2);
       setError(`Transfer failed (${res.status})\n\n${errText}`);
       setSubmitting(false);
+      // keep draft key so a retry uses the same key
       return;
     }
 
     setResult(res.body);
     await loadData();
     setSubmitting(false);
+
+    // Success means this intent is done; next transfer should get a new key.
+    clearDraftIdemKey();
+    setAmount("");
   }
 
   return (
@@ -225,7 +248,8 @@ export default function TransferPage() {
                     ) : (
                       payees.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.email}{p.label ? ` (${p.label})` : ""}
+                          {p.email}
+                          {p.label ? ` (${p.label})` : ""}
                         </option>
                       ))
                     )}
@@ -255,9 +279,7 @@ export default function TransferPage() {
               </form>
 
               {payees.length === 0 && (
-                <p className={styles.hint}>
-                  Add a payee first, then come back here to send money.
-                </p>
+                <p className={styles.hint}>Add a payee first, then come back here to send money.</p>
               )}
 
               {lastKey && (
@@ -281,7 +303,9 @@ export default function TransferPage() {
                     <div className={styles.acctRow} key={a.id}>
                       <div>
                         <div className={styles.mono}>{a.accountType}</div>
-                        <div className={styles.subSmall}>{a.status} • {a.currency}</div>
+                        <div className={styles.subSmall}>
+                          {a.status} • {a.currency}
+                        </div>
                       </div>
                       <div className={styles.right}>
                         <div className={styles.subSmall}>Available</div>
