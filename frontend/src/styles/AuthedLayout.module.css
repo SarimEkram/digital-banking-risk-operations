@@ -1,5 +1,7 @@
 .shell {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .topNav {
@@ -82,4 +84,10 @@
   max-width: 1100px;
   margin: 0 auto;
   padding: 22px 18px 40px;
+
+  /* Important: stop the window from scrolling because of inner pages */
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  width: 100%;
 }
