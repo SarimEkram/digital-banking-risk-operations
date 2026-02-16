@@ -90,8 +90,8 @@ public class TransferService {
             throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
         }
 
-        //  idempotency check
-        var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
+        // idempotency check (SCOPED to actor)
+        var existing = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
         if (existing.isPresent()) {
             TransferEntity t = existing.get();
 
@@ -109,6 +109,14 @@ public class TransferService {
             }
 
             return toResponse(t);
+        }
+
+        // If the key exists but doesn't belong to this actor, return a clean 409 (avoid leaking data)
+        if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Idempotency-Key was already used"
+            );
         }
 
         // 3) lock both accounts
@@ -160,23 +168,35 @@ public class TransferService {
             t = transferRepository.saveAndFlush(t);
             entityManager.refresh(t);
         } catch (DataIntegrityViolationException dup) {
-            // if another request with same idempotency key won the race, return that one
-            return transferRepository.findByIdempotencyKey(idempotencyKey)
-                    .map(this::toResponse)
-                    .orElseThrow(() -> dup);
+            // race: if another request with same idempotency key won, return it (ONLY if it belongs to actor)
+            var winner = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
+            if (winner.isPresent()) {
+                return toResponse(winner.get());
+            }
+
+            // key exists but not ours -> clean conflict (avoid 500 + avoid leaking details)
+            if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Idempotency-Key was already used"
+                );
+            }
+
+            // otherwise, rethrow
+            throw dup;
         }
 
         LedgerEntryEntity debit = new LedgerEntryEntity();
         debit.setTransfer(t);
         debit.setAccount(from);
-        debit.setDirection(LedgerDirection.DEBIT);
+        debit.setDirection(com.sarim.digitalbanking.ledger.LedgerDirection.DEBIT);
         debit.setAmountCents(amount);
         debit.setCurrency(currency);
 
         LedgerEntryEntity credit = new LedgerEntryEntity();
         credit.setTransfer(t);
         credit.setAccount(to);
-        credit.setDirection(LedgerDirection.CREDIT);
+        credit.setDirection(com.sarim.digitalbanking.ledger.LedgerDirection.CREDIT);
         credit.setAmountCents(amount);
         credit.setCurrency(currency);
 
