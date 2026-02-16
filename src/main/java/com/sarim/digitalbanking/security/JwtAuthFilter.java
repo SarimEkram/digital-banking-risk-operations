@@ -64,7 +64,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             Long uid = (uidNum == null) ? null : uidNum.longValue();
 
             if (email != null && !email.isBlank() && role != null && !role.isBlank()) {
-                // make uid/role available to controllers
                 if (uid != null) request.setAttribute("uid", uid);
                 request.setAttribute("role", role);
 

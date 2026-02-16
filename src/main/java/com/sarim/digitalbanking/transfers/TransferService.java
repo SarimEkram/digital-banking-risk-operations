@@ -13,14 +13,19 @@ import com.sarim.digitalbanking.ledger.LedgerEntryRepository;
 import com.sarim.digitalbanking.payees.PayeeEntity;
 import com.sarim.digitalbanking.payees.PayeeRepository;
 import com.sarim.digitalbanking.transfers.api.CreateTransferRequest;
+import com.sarim.digitalbanking.transfers.api.TransferPageResponse;
 import com.sarim.digitalbanking.transfers.api.TransferResponse;
 import jakarta.persistence.EntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 
@@ -170,33 +175,25 @@ public class TransferService {
         } catch (DataIntegrityViolationException dup) {
             // race: if another request with same idempotency key won, return it (ONLY if it belongs to actor)
             var winner = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
-            if (winner.isPresent()) {
-                return toResponse(winner.get());
-            }
+            if (winner.isPresent()) return toResponse(winner.get());
 
-            // key exists but not ours -> clean conflict (avoid 500 + avoid leaking details)
             if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Idempotency-Key was already used"
-                );
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
             }
-
-            // otherwise, rethrow
             throw dup;
         }
 
         LedgerEntryEntity debit = new LedgerEntryEntity();
         debit.setTransfer(t);
         debit.setAccount(from);
-        debit.setDirection(com.sarim.digitalbanking.ledger.LedgerDirection.DEBIT);
+        debit.setDirection(LedgerDirection.DEBIT);
         debit.setAmountCents(amount);
         debit.setCurrency(currency);
 
         LedgerEntryEntity credit = new LedgerEntryEntity();
         credit.setTransfer(t);
         credit.setAccount(to);
-        credit.setDirection(com.sarim.digitalbanking.ledger.LedgerDirection.CREDIT);
+        credit.setDirection(LedgerDirection.CREDIT);
         credit.setAmountCents(amount);
         credit.setCurrency(currency);
 
@@ -223,6 +220,51 @@ public class TransferService {
         auditLogRepository.save(log);
 
         return toResponse(t);
+    }
+
+    @Transactional(readOnly = true)
+    public TransferPageResponse listTransfers(Long actorUserId, int limit, String cursor) {
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        var pageable = PageRequest.of(0, safeLimit + 1);
+
+        List<TransferEntity> page;
+        if (cursor == null || cursor.isBlank()) {
+            page = transferRepository.findFirstPageForUser(actorUserId, pageable);
+        } else {
+            long[] decoded = decodeCursor(cursor); // [createdAtMillis, id]
+            Instant beforeCreatedAt = Instant.ofEpochMilli(decoded[0]);
+            long beforeId = decoded[1];
+
+            page = transferRepository.findPageForUserBefore(actorUserId, beforeCreatedAt, beforeId, pageable);
+        }
+
+        String nextCursor = null;
+        if (page.size() > safeLimit) {
+            var last = page.get(safeLimit - 1);
+            nextCursor = encodeCursor(last.getCreatedAt(), last.getId());
+            page = page.subList(0, safeLimit);
+        }
+
+        var items = page.stream().map(this::toResponse).toList();
+        return new TransferPageResponse(items, nextCursor);
+    }
+
+    private String encodeCursor(Instant createdAt, Long id) {
+        String raw = createdAt.toEpochMilli() + ":" + id;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private long[] decodeCursor(String cursor) {
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = raw.split(":");
+            if (parts.length != 2) throw new IllegalArgumentException("bad cursor");
+            long createdAtMillis = Long.parseLong(parts[0]);
+            long id = Long.parseLong(parts[1]);
+            return new long[]{createdAtMillis, id};
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid cursor");
+        }
     }
 
     private TransferResponse toResponse(TransferEntity t) {
