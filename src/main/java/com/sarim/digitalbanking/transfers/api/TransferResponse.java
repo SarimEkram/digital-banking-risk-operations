@@ -9,5 +9,11 @@ public record TransferResponse(
         long amountCents,
         String currency,
         String status,
-        Instant createdAt
+        Instant createdAt,
+
+        // NEW (for Activity UI)
+        String fromEmail,
+        String toEmail,
+        String direction,          // "SENT" | "RECEIVED" | "UNKNOWN"
+        String counterpartyEmail   // who you sent to / received from
 ) {}

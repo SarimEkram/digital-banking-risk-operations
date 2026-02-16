@@ -1,0 +1,162 @@
+/* ActivityPage.module.css */
+
+.page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 56px 24px;
+
+  /* lock the page so the WINDOW never scrolls */
+  height: calc(100vh - 72px);
+  overflow: hidden;
+}
+
+.card {
+  width: 100% !important;
+  max-width: 1040px !important;
+  padding: 28px !important;
+  border-radius: 18px !important;
+
+  /* card becomes the only scroll container (inside tableWrap) */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0.2px;
+}
+
+.sub {
+  margin: 0;
+  color: #a8b3cf;
+  font-size: 14px;
+}
+
+.tableWrap {
+  flex: 1;
+  overflow: auto;
+
+  border: 1px solid #1f2a44;
+  background: rgba(11, 18, 32, 0.55);
+  border-radius: 14px;
+}
+
+/* keep columns readable on small screens */
+.table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+
+  background: rgba(9, 15, 28, 0.96);
+  backdrop-filter: blur(10px);
+
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: #a8b3cf;
+  border-bottom: 1px solid #1f2a44;
+}
+
+.tbody td {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #e5e7eb;
+  border-bottom: 1px solid rgba(31, 42, 68, 0.55);
+}
+
+.row:hover td {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* date group header rows like: "Feb 15, 2026" */
+.groupRow td {
+  padding: 12px 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #e5e7eb;
+
+  background: rgba(15, 26, 48, 0.25);
+  border-bottom: 1px solid rgba(31, 42, 68, 0.9);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #24314f;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  color: #d1d5db;
+  background: rgba(15, 26, 48, 0.6);
+}
+
+.pillSent {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.pillReceived {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.button {
+  appearance: none;
+  border: 1px solid #24314f;
+  background: rgba(15, 26, 48, 0.6);
+  color: #e5e7eb;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+/* optional: hide the inner scrollbar “track” a bit (still scrolls) */
+.tableWrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tableWrap::-webkit-scrollbar-thumb {
+  background: rgba(36, 49, 79, 0.9);
+  border-radius: 999px;
+}
+.tableWrap::-webkit-scrollbar-track {
+  background: rgba(11, 18, 32, 0.35);
+}

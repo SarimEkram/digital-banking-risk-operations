@@ -113,7 +113,7 @@ public class TransferService {
                 );
             }
 
-            return toResponse(t);
+            return toResponse(t, actorUserId);
         }
 
         // If the key exists but doesn't belong to this actor, return a clean 409 (avoid leaking data)
@@ -173,9 +173,8 @@ public class TransferService {
             t = transferRepository.saveAndFlush(t);
             entityManager.refresh(t);
         } catch (DataIntegrityViolationException dup) {
-            // race: if another request with same idempotency key won, return it (ONLY if it belongs to actor)
             var winner = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
-            if (winner.isPresent()) return toResponse(winner.get());
+            if (winner.isPresent()) return toResponse(winner.get(), actorUserId);
 
             if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
@@ -219,7 +218,7 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        return toResponse(t);
+        return toResponse(t, actorUserId);
     }
 
     @Transactional(readOnly = true)
@@ -245,7 +244,7 @@ public class TransferService {
             page = page.subList(0, safeLimit);
         }
 
-        var items = page.stream().map(this::toResponse).toList();
+        var items = page.stream().map(t -> toResponse(t, actorUserId)).toList();
         return new TransferPageResponse(items, nextCursor);
     }
 
@@ -267,7 +266,24 @@ public class TransferService {
         }
     }
 
-    private TransferResponse toResponse(TransferEntity t) {
+    private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
+        Long fromUid = t.getFromAccount().getUser().getId();
+        Long toUid   = t.getToAccount().getUser().getId();
+
+        String fromEmail = t.getFromAccount().getUser().getEmail();
+        String toEmail   = t.getToAccount().getUser().getEmail();
+
+        String direction = "UNKNOWN";
+        String counterpartyEmail = null;
+
+        if (actorUserId != null && actorUserId.equals(fromUid)) {
+            direction = "SENT";
+            counterpartyEmail = toEmail;
+        } else if (actorUserId != null && actorUserId.equals(toUid)) {
+            direction = "RECEIVED";
+            counterpartyEmail = fromEmail;
+        }
+
         return new TransferResponse(
                 t.getId(),
                 t.getFromAccount().getId(),
@@ -275,7 +291,11 @@ public class TransferService {
                 t.getAmountCents(),
                 t.getCurrency(),
                 t.getStatus().name(),
-                t.getCreatedAt()
+                t.getCreatedAt(),
+                fromEmail,
+                toEmail,
+                direction,
+                counterpartyEmail
         );
     }
 }
