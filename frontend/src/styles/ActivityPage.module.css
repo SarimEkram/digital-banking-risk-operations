@@ -153,3 +153,95 @@
 .tableWrap::-webkit-scrollbar-track {
   background: rgba(11, 18, 32, 0.35);
 }
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 12px;
+}
+
+/* --- filters --- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 10px 0 12px;
+
+  border: 1px solid #1f2a44;
+  background: rgba(11, 18, 32, 0.35);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.control {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  flex: 1;
+}
+
+.controlLabel {
+  font-size: 12px;
+  color: #a8b3cf;
+  letter-spacing: 0.2px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #24314f;
+  background: rgba(15, 26, 48, 0.6);
+  color: #e5e7eb;
+  outline: none;
+}
+
+.input:focus {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #24314f;
+  background: rgba(15, 26, 48, 0.6);
+  color: #e5e7eb;
+  outline: none;
+}
+
+.select:focus {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.buttonAlt {
+  appearance: none;
+  border: 1px solid #24314f;
+  background: rgba(15, 26, 48, 0.6);
+  color: #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  height: 42px;
+}
+
+.buttonAlt:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+.hint {
+  margin-top: 10px;
+  color: #a8b3cf;
+  font-size: 12px;
+  line-height: 1.35;
+}
