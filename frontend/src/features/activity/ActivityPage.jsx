@@ -15,7 +15,7 @@ function formatMoney(amountCents, currency) {
     return `${amount.toFixed(2)} ${currency || ""}`.trim();
   }
 }
-
+// aa
 function formatDayLabel(iso) {
   try {
     return new Intl.DateTimeFormat(undefined, {
