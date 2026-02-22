@@ -32,7 +32,7 @@ import java.util.List;
 @Service
 public class TransferService {
 
-    // all variabless
+
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
