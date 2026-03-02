@@ -3,6 +3,7 @@ package com.sarim.digitalbanking.transfers;
 import com.sarim.digitalbanking.accounts.AccountEntity;
 import com.sarim.digitalbanking.accounts.AccountRepository;
 import com.sarim.digitalbanking.accounts.AccountType;
+import com.sarim.digitalbanking.admin.api.CreateAdminDepositRequest;
 import com.sarim.digitalbanking.audit.AuditLogEntity;
 import com.sarim.digitalbanking.audit.AuditLogRepository;
 import com.sarim.digitalbanking.auth.UserEntity;
@@ -32,6 +33,8 @@ import java.util.List;
 @Service
 public class TransferService {
 
+    private static final String SYSTEM_USER_EMAIL = "system@bank.local";
+    private static final String CAD = "CAD";
 
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
@@ -220,6 +223,170 @@ public class TransferService {
         auditLogRepository.save(log);
 
         return toResponse(t, actorUserId);
+    }
+
+    @Transactional
+    public TransferResponse createAdminDeposit(Long adminUserId, String idempotencyKey, CreateAdminDepositRequest req) {
+        long amount = req.amountCents();
+        if (amount <= 0) {
+            throw new IllegalArgumentException("amountCents must be > 0");
+        }
+
+        // 1) resolve actor admin (for audit)
+        UserEntity adminActor = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (adminActor.getRole() == null || !"ADMIN".equalsIgnoreCase(adminActor.getRole().name())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only");
+        }
+
+        // 2) resolve treasury/system user + ACTIVE CHEQUING CAD account
+        UserEntity systemUser = userRepository.findByEmailIgnoreCase(SYSTEM_USER_EMAIL)
+                .orElseThrow(() -> new IllegalArgumentException("system user not found"));
+
+        Long treasuryAccountId = accountRepository
+                .findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(
+                        systemUser.getId(),
+                        AccountType.CHEQUING,
+                        CAD,
+                        "ACTIVE"
+                )
+                .map(AccountEntity::getId)
+                .orElseThrow(() -> new IllegalArgumentException("system treasury account not found"));
+
+        if (req.toAccountId().equals(treasuryAccountId)) {
+            throw new IllegalArgumentException("toAccountId must be different from treasury account");
+        }
+
+        // 3) idempotency check (global, because source account is treasury, not the admin actor)
+        var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            TransferEntity t = existing.get();
+
+            boolean same =
+                    t.getFromAccount().getId().equals(treasuryAccountId) &&
+                            t.getToAccount().getId().equals(req.toAccountId()) &&
+                            t.getAmountCents() == amount &&
+                            CAD.equalsIgnoreCase(t.getCurrency());
+
+            if (!same) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Idempotency-Key was already used with a different request"
+                );
+            }
+
+            // Return from treasury perspective so direction is SENT
+            return toResponse(t, systemUser.getId());
+        }
+
+        // 4) lock treasury + destination account
+        List<Long> ids = List.of(treasuryAccountId, req.toAccountId()).stream()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+
+        List<AccountEntity> locked = accountRepository.findByIdInForUpdate(ids);
+        if (locked.size() != 2) {
+            throw new IllegalArgumentException("Account not found");
+        }
+
+        AccountEntity from = locked.get(0).getId().equals(treasuryAccountId) ? locked.get(0) : locked.get(1);
+        AccountEntity to   = locked.get(0).getId().equals(req.toAccountId())  ? locked.get(0) : locked.get(1);
+
+        // 5) safety checks
+        if (!from.getUser().getId().equals(systemUser.getId())) {
+            throw new IllegalArgumentException("system treasury account not found");
+        }
+
+        if (!"ACTIVE".equalsIgnoreCase(from.getStatus())) {
+            throw new IllegalArgumentException("Treasury account is not active");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(to.getStatus())) {
+            throw new IllegalArgumentException("To account is not active");
+        }
+
+        if (from.getAccountType() != AccountType.CHEQUING) {
+            throw new IllegalArgumentException("Treasury account must be CHEQUING");
+        }
+        if (to.getAccountType() != AccountType.CHEQUING) {
+            throw new IllegalArgumentException("Destination account must be CHEQUING");
+        }
+
+        if (!CAD.equalsIgnoreCase(from.getCurrency()) || !CAD.equalsIgnoreCase(to.getCurrency())) {
+            throw new IllegalArgumentException("Both accounts must be CAD");
+        }
+
+        if (from.getBalanceCents() < amount) {
+            throw new IllegalArgumentException("insufficient treasury funds");
+        }
+
+        // 6) create transfer
+        TransferEntity t = new TransferEntity();
+        t.setFromAccount(from);
+        t.setToAccount(to);
+        t.setAmountCents(amount);
+        t.setCurrency(CAD);
+        t.setStatus(TransferStatus.COMPLETED);
+        t.setIdempotencyKey(idempotencyKey);
+
+        try {
+            t = transferRepository.saveAndFlush(t);
+            entityManager.refresh(t);
+        } catch (DataIntegrityViolationException dup) {
+            var winner = transferRepository.findByIdempotencyKey(idempotencyKey);
+            if (winner.isPresent()) {
+                TransferEntity existingWinner = winner.get();
+
+                boolean same =
+                        existingWinner.getFromAccount().getId().equals(treasuryAccountId) &&
+                                existingWinner.getToAccount().getId().equals(req.toAccountId()) &&
+                                existingWinner.getAmountCents() == amount &&
+                                CAD.equalsIgnoreCase(existingWinner.getCurrency());
+
+                if (same) {
+                    return toResponse(existingWinner, systemUser.getId());
+                }
+            }
+
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
+        }
+
+        // 7) ledger entries
+        LedgerEntryEntity debit = new LedgerEntryEntity();
+        debit.setTransfer(t);
+        debit.setAccount(from);
+        debit.setDirection(LedgerDirection.DEBIT);
+        debit.setAmountCents(amount);
+        debit.setCurrency(CAD);
+
+        LedgerEntryEntity credit = new LedgerEntryEntity();
+        credit.setTransfer(t);
+        credit.setAccount(to);
+        credit.setDirection(LedgerDirection.CREDIT);
+        credit.setAmountCents(amount);
+        credit.setCurrency(CAD);
+
+        ledgerEntryRepository.saveAll(List.of(debit, credit));
+
+        // 8) balances
+        from.setBalanceCents(from.getBalanceCents() - amount);
+        to.setBalanceCents(to.getBalanceCents() + amount);
+        accountRepository.saveAll(List.of(from, to));
+
+        // 9) audit
+        AuditLogEntity log = new AuditLogEntity();
+        log.setActorUser(adminActor); // actual admin who initiated the deposit
+        log.setAction("ADMIN_DEPOSIT");
+        log.setEntityType("transfer");
+        log.setEntityId(String.valueOf(t.getId()));
+        log.setDetails("from_treasury=" + from.getId()
+                + ", to=" + to.getId()
+                + ", amount_cents=" + amount
+                + ", currency=" + CAD);
+        auditLogRepository.save(log);
+
+        // Return from treasury perspective so UI direction becomes SENT
+        return toResponse(t, systemUser.getId());
     }
 
     @Transactional(readOnly = true)
