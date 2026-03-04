@@ -65,7 +65,7 @@ public class TransferService {
     @Transactional
     public TransferResponse createTransfer(Long actorUserId, String idempotencyKey, CreateTransferRequest req) {
         String currency = (req.currency() == null || req.currency().isBlank())
-                ? "CAD"
+                ? CAD
                 : req.currency().trim().toUpperCase();
 
         if (currency.length() != 3) {
@@ -165,13 +165,7 @@ public class TransferService {
         }
 
         // 5) create transfer + ledger entries + balances
-        TransferEntity t = new TransferEntity();
-        t.setFromAccount(from);
-        t.setToAccount(to);
-        t.setAmountCents(amount);
-        t.setCurrency(currency);
-        t.setStatus(TransferStatus.COMPLETED);
-        t.setIdempotencyKey(idempotencyKey);
+        TransferEntity t = newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
         try {
             t = transferRepository.saveAndFlush(t);
@@ -186,25 +180,7 @@ public class TransferService {
             throw dup;
         }
 
-        LedgerEntryEntity debit = new LedgerEntryEntity();
-        debit.setTransfer(t);
-        debit.setAccount(from);
-        debit.setDirection(LedgerDirection.DEBIT);
-        debit.setAmountCents(amount);
-        debit.setCurrency(currency);
-
-        LedgerEntryEntity credit = new LedgerEntryEntity();
-        credit.setTransfer(t);
-        credit.setAccount(to);
-        credit.setDirection(LedgerDirection.CREDIT);
-        credit.setAmountCents(amount);
-        credit.setCurrency(currency);
-
-        ledgerEntryRepository.saveAll(List.of(debit, credit));
-
-        from.setBalanceCents(from.getBalanceCents() - amount);
-        to.setBalanceCents(to.getBalanceCents() + amount);
-        accountRepository.saveAll(List.of(from, to));
+        applyLedgerAndBalances(t, from, to, amount, currency);
 
         UserEntity actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -321,13 +297,7 @@ public class TransferService {
         }
 
         // 6) create transfer
-        TransferEntity t = new TransferEntity();
-        t.setFromAccount(from);
-        t.setToAccount(to);
-        t.setAmountCents(amount);
-        t.setCurrency(CAD);
-        t.setStatus(TransferStatus.COMPLETED);
-        t.setIdempotencyKey(idempotencyKey);
+        TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
         try {
             t = transferRepository.saveAndFlush(t);
@@ -351,27 +321,7 @@ public class TransferService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
         }
 
-        // 7) ledger entries
-        LedgerEntryEntity debit = new LedgerEntryEntity();
-        debit.setTransfer(t);
-        debit.setAccount(from);
-        debit.setDirection(LedgerDirection.DEBIT);
-        debit.setAmountCents(amount);
-        debit.setCurrency(CAD);
-
-        LedgerEntryEntity credit = new LedgerEntryEntity();
-        credit.setTransfer(t);
-        credit.setAccount(to);
-        credit.setDirection(LedgerDirection.CREDIT);
-        credit.setAmountCents(amount);
-        credit.setCurrency(CAD);
-
-        ledgerEntryRepository.saveAll(List.of(debit, credit));
-
-        // 8) balances
-        from.setBalanceCents(from.getBalanceCents() - amount);
-        to.setBalanceCents(to.getBalanceCents() + amount);
-        accountRepository.saveAll(List.of(from, to));
+        applyLedgerAndBalances(t, from, to, amount, CAD);
 
         // 9) audit
         AuditLogEntity log = new AuditLogEntity();
@@ -432,6 +382,51 @@ public class TransferService {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid cursor");
         }
+    }
+
+    private TransferEntity newCompletedTransfer(
+            AccountEntity from,
+            AccountEntity to,
+            long amountCents,
+            String currency,
+            String idempotencyKey
+    ) {
+        TransferEntity t = new TransferEntity();
+        t.setFromAccount(from);
+        t.setToAccount(to);
+        t.setAmountCents(amountCents);
+        t.setCurrency(currency);
+        t.setStatus(TransferStatus.COMPLETED);
+        t.setIdempotencyKey(idempotencyKey);
+        return t;
+    }
+
+    private void applyLedgerAndBalances(
+            TransferEntity transfer,
+            AccountEntity from,
+            AccountEntity to,
+            long amountCents,
+            String currency
+    ) {
+        LedgerEntryEntity debit = new LedgerEntryEntity();
+        debit.setTransfer(transfer);
+        debit.setAccount(from);
+        debit.setDirection(LedgerDirection.DEBIT);
+        debit.setAmountCents(amountCents);
+        debit.setCurrency(currency);
+
+        LedgerEntryEntity credit = new LedgerEntryEntity();
+        credit.setTransfer(transfer);
+        credit.setAccount(to);
+        credit.setDirection(LedgerDirection.CREDIT);
+        credit.setAmountCents(amountCents);
+        credit.setCurrency(currency);
+
+        ledgerEntryRepository.saveAll(List.of(debit, credit));
+
+        from.setBalanceCents(from.getBalanceCents() - amountCents);
+        to.setBalanceCents(to.getBalanceCents() + amountCents);
+        accountRepository.saveAll(List.of(from, to));
     }
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
