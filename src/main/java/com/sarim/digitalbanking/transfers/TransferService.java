@@ -29,6 +29,9 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 @Service
 public class TransferService {
@@ -104,11 +107,7 @@ public class TransferService {
         if (existing.isPresent()) {
             TransferEntity t = existing.get();
 
-            boolean same =
-                    t.getFromAccount().getId().equals(req.fromAccountId()) &&
-                            t.getToAccount().getId().equals(toAccountId) &&
-                            t.getAmountCents() == amount &&
-                            t.getCurrency().equalsIgnoreCase(currency);
+            boolean same = sameTransferRequest(t, req.fromAccountId(), toAccountId, amount, currency);
 
             if (!same) {
                 throw new ResponseStatusException(
@@ -167,18 +166,13 @@ public class TransferService {
         // 5) create transfer + ledger entries + balances
         TransferEntity t = newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
-        try {
-            t = transferRepository.saveAndFlush(t);
-            entityManager.refresh(t);
-        } catch (DataIntegrityViolationException dup) {
-            var winner = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
-            if (winner.isPresent()) return toResponse(winner.get(), actorUserId);
-
-            if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
-            }
-            throw dup;
-        }
+        t = saveTransferWithIdempotentReplay(
+                t,
+                idempotencyKey,
+                () -> transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId),
+                winner -> sameTransferRequest(winner, req.fromAccountId(), toAccountId, amount, currency),
+                true
+        );
 
         applyLedgerAndBalances(t, from, to, amount, currency);
 
@@ -239,11 +233,7 @@ public class TransferService {
         if (existing.isPresent()) {
             TransferEntity t = existing.get();
 
-            boolean same =
-                    t.getFromAccount().getId().equals(treasuryAccountId) &&
-                            t.getToAccount().getId().equals(req.toAccountId()) &&
-                            t.getAmountCents() == amount &&
-                            CAD.equalsIgnoreCase(t.getCurrency());
+            boolean same = sameTransferRequest(t, treasuryAccountId, req.toAccountId(), amount, CAD);
 
             if (!same) {
                 throw new ResponseStatusException(
@@ -299,27 +289,13 @@ public class TransferService {
         // 6) create transfer
         TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
-        try {
-            t = transferRepository.saveAndFlush(t);
-            entityManager.refresh(t);
-        } catch (DataIntegrityViolationException dup) {
-            var winner = transferRepository.findByIdempotencyKey(idempotencyKey);
-            if (winner.isPresent()) {
-                TransferEntity existingWinner = winner.get();
-
-                boolean same =
-                        existingWinner.getFromAccount().getId().equals(treasuryAccountId) &&
-                                existingWinner.getToAccount().getId().equals(req.toAccountId()) &&
-                                existingWinner.getAmountCents() == amount &&
-                                CAD.equalsIgnoreCase(existingWinner.getCurrency());
-
-                if (same) {
-                    return toResponse(existingWinner, systemUser.getId());
-                }
-            }
-
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
-        }
+        t = saveTransferWithIdempotentReplay(
+                t,
+                idempotencyKey,
+                () -> transferRepository.findByIdempotencyKey(idempotencyKey),
+                winner -> sameTransferRequest(winner, treasuryAccountId, req.toAccountId(), amount, CAD),
+                false
+        );
 
         applyLedgerAndBalances(t, from, to, amount, CAD);
 
@@ -427,6 +403,54 @@ public class TransferService {
         from.setBalanceCents(from.getBalanceCents() - amountCents);
         to.setBalanceCents(to.getBalanceCents() + amountCents);
         accountRepository.saveAll(List.of(from, to));
+    }
+
+    private boolean sameTransferRequest(
+            TransferEntity t,
+            Long expectedFromAccountId,
+            Long expectedToAccountId,
+            long expectedAmountCents,
+            String expectedCurrency
+    ) {
+        return t.getFromAccount().getId().equals(expectedFromAccountId)
+                && t.getToAccount().getId().equals(expectedToAccountId)
+                && t.getAmountCents() == expectedAmountCents
+                && t.getCurrency().equalsIgnoreCase(expectedCurrency);
+    }
+
+    private TransferEntity saveTransferWithIdempotentReplay(
+            TransferEntity candidate,
+            String idempotencyKey,
+            Supplier<Optional<TransferEntity>> replayLookup,
+            Predicate<TransferEntity> sameRequest,
+            boolean rethrowUnknownDuplicate
+    ) {
+        try {
+            TransferEntity saved = transferRepository.saveAndFlush(candidate);
+            entityManager.refresh(saved);
+            return saved;
+        } catch (DataIntegrityViolationException dup) {
+            Optional<TransferEntity> winnerOpt = replayLookup.get();
+
+            if (winnerOpt.isPresent()) {
+                TransferEntity winner = winnerOpt.get();
+
+                if (sameRequest.test(winner)) {
+                    return winner;
+                }
+
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Idempotency-Key was already used with a different request"
+                );
+            }
+
+            if (!rethrowUnknownDuplicate || transferRepository.existsByIdempotencyKey(idempotencyKey)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
+            }
+
+            throw dup;
+        }
     }
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
