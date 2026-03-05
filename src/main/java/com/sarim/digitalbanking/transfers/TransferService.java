@@ -38,6 +38,7 @@ public class TransferService {
 
     private static final String SYSTEM_USER_EMAIL = "system@bank.local";
     private static final String CAD = "CAD";
+    private static final long RISK_HOLD_THRESHOLD_CENTS = 100_000; // $1000.00
 
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
@@ -163,10 +164,14 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient funds");
         }
 
-        // 5) create transfer + ledger entries + balances
-        TransferEntity t = newCompletedTransfer(from, to, amount, currency, idempotencyKey);
+        // 5) create transfer
+        boolean holdForReview = shouldHoldForReview(amount);
 
-        t = saveTransferWithIdempotentReplay(
+        TransferEntity t = holdForReview
+                ? newHeldTransfer(from, to, amount, currency, idempotencyKey)
+                : newCompletedTransfer(from, to, amount, currency, idempotencyKey);
+
+        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
                 t,
                 idempotencyKey,
                 () -> transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId),
@@ -174,10 +179,36 @@ public class TransferService {
                 true
         );
 
-        applyLedgerAndBalances(t, from, to, amount, currency);
+        t = saveOutcome.transfer();
+        if (saveOutcome.replayed()) {
+            return toResponse(t, actorUserId);
+        }
 
         UserEntity actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (holdForReview) {
+            applyHeldTransferReserve(t, from, amount, currency);
+
+            AuditLogEntity log = new AuditLogEntity();
+            log.setActorUser(actor);
+            log.setAction("TRANSFER_HELD");
+            log.setEntityType("transfer");
+            log.setEntityId(String.valueOf(t.getId()));
+            log.setDetails("from=" + from.getId()
+                    + ", payee_id=" + payee.getId()
+                    + ", to=" + to.getId()
+                    + ", amount_cents=" + amount
+                    + ", currency=" + currency
+                    + ", reason=amount threshold exceeded"
+                    + ", funds_reserved=true");
+
+            auditLogRepository.save(log);
+
+            return toResponse(t, actorUserId);
+        }
+
+        applyLedgerAndBalances(t, from, to, amount, currency);
 
         AuditLogEntity log = new AuditLogEntity();
         log.setActorUser(actor);
@@ -289,13 +320,18 @@ public class TransferService {
         // 6) create transfer
         TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
-        t = saveTransferWithIdempotentReplay(
+        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
                 t,
                 idempotencyKey,
                 () -> transferRepository.findByIdempotencyKey(idempotencyKey),
                 winner -> sameTransferRequest(winner, treasuryAccountId, req.toAccountId(), amount, CAD),
                 false
         );
+
+        t = saveOutcome.transfer();
+        if (saveOutcome.replayed()) {
+            return toResponse(t, systemUser.getId());
+        }
 
         applyLedgerAndBalances(t, from, to, amount, CAD);
 
@@ -360,6 +396,29 @@ public class TransferService {
         }
     }
 
+    private boolean shouldHoldForReview(long amountCents) {
+        return amountCents >= RISK_HOLD_THRESHOLD_CENTS;
+    }
+
+    private TransferEntity newHeldTransfer(
+            AccountEntity from,
+            AccountEntity to,
+            long amountCents,
+            String currency,
+            String idempotencyKey
+    ) {
+        TransferEntity t = new TransferEntity();
+        t.setFromAccount(from);
+        t.setToAccount(to);
+        t.setAmountCents(amountCents);
+        t.setCurrency(currency);
+        t.setStatus(TransferStatus.PENDING_REVIEW);
+        t.setRiskDecision("HOLD");
+        t.setRiskReasons("amount threshold exceeded");
+        t.setIdempotencyKey(idempotencyKey);
+        return t;
+    }
+
     private TransferEntity newCompletedTransfer(
             AccountEntity from,
             AccountEntity to,
@@ -375,6 +434,25 @@ public class TransferService {
         t.setStatus(TransferStatus.COMPLETED);
         t.setIdempotencyKey(idempotencyKey);
         return t;
+    }
+
+    private void applyHeldTransferReserve(
+            TransferEntity transfer,
+            AccountEntity from,
+            long amountCents,
+            String currency
+    ) {
+        LedgerEntryEntity debit = new LedgerEntryEntity();
+        debit.setTransfer(transfer);
+        debit.setAccount(from);
+        debit.setDirection(LedgerDirection.DEBIT);
+        debit.setAmountCents(amountCents);
+        debit.setCurrency(currency);
+
+        ledgerEntryRepository.save(debit);
+
+        from.setBalanceCents(from.getBalanceCents() - amountCents);
+        accountRepository.save(from);
     }
 
     private void applyLedgerAndBalances(
@@ -418,7 +496,7 @@ public class TransferService {
                 && t.getCurrency().equalsIgnoreCase(expectedCurrency);
     }
 
-    private TransferEntity saveTransferWithIdempotentReplay(
+    private SaveTransferOutcome saveTransferWithIdempotentReplay(
             TransferEntity candidate,
             String idempotencyKey,
             Supplier<Optional<TransferEntity>> replayLookup,
@@ -428,7 +506,7 @@ public class TransferService {
         try {
             TransferEntity saved = transferRepository.saveAndFlush(candidate);
             entityManager.refresh(saved);
-            return saved;
+            return new SaveTransferOutcome(saved, false);
         } catch (DataIntegrityViolationException dup) {
             Optional<TransferEntity> winnerOpt = replayLookup.get();
 
@@ -436,7 +514,7 @@ public class TransferService {
                 TransferEntity winner = winnerOpt.get();
 
                 if (sameRequest.test(winner)) {
-                    return winner;
+                    return new SaveTransferOutcome(winner, true);
                 }
 
                 throw new ResponseStatusException(
@@ -452,6 +530,8 @@ public class TransferService {
             throw dup;
         }
     }
+
+    private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
         Long fromUid = t.getFromAccount().getUser().getId();
