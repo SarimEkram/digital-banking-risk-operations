@@ -166,13 +166,18 @@ public class TransferService {
         // 5) create transfer + ledger entries + balances
         TransferEntity t = newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
-        t = saveTransferWithIdempotentReplay(
+        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
                 t,
                 idempotencyKey,
                 () -> transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId),
                 winner -> sameTransferRequest(winner, req.fromAccountId(), toAccountId, amount, currency),
                 true
         );
+
+        t = saveOutcome.transfer();
+        if (saveOutcome.replayed()) {
+            return toResponse(t, actorUserId);
+        }
 
         applyLedgerAndBalances(t, from, to, amount, currency);
 
@@ -289,13 +294,18 @@ public class TransferService {
         // 6) create transfer
         TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
-        t = saveTransferWithIdempotentReplay(
+        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
                 t,
                 idempotencyKey,
                 () -> transferRepository.findByIdempotencyKey(idempotencyKey),
                 winner -> sameTransferRequest(winner, treasuryAccountId, req.toAccountId(), amount, CAD),
                 false
         );
+
+        t = saveOutcome.transfer();
+        if (saveOutcome.replayed()) {
+            return toResponse(t, systemUser.getId());
+        }
 
         applyLedgerAndBalances(t, from, to, amount, CAD);
 
@@ -418,7 +428,7 @@ public class TransferService {
                 && t.getCurrency().equalsIgnoreCase(expectedCurrency);
     }
 
-    private TransferEntity saveTransferWithIdempotentReplay(
+    private SaveTransferOutcome saveTransferWithIdempotentReplay(
             TransferEntity candidate,
             String idempotencyKey,
             Supplier<Optional<TransferEntity>> replayLookup,
@@ -428,7 +438,7 @@ public class TransferService {
         try {
             TransferEntity saved = transferRepository.saveAndFlush(candidate);
             entityManager.refresh(saved);
-            return saved;
+            return new SaveTransferOutcome(saved, false);
         } catch (DataIntegrityViolationException dup) {
             Optional<TransferEntity> winnerOpt = replayLookup.get();
 
@@ -436,7 +446,7 @@ public class TransferService {
                 TransferEntity winner = winnerOpt.get();
 
                 if (sameRequest.test(winner)) {
-                    return winner;
+                    return new SaveTransferOutcome(winner, true);
                 }
 
                 throw new ResponseStatusException(
@@ -452,6 +462,8 @@ public class TransferService {
             throw dup;
         }
     }
+
+    private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
         Long fromUid = t.getFromAccount().getUser().getId();
