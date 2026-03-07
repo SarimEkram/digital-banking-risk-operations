@@ -6,7 +6,6 @@
   padding: 56px 24px;
 }
 
-
 .dashboardCard {
   width: 100% !important;
   max-width: 1040px !important;
@@ -47,7 +46,6 @@
   color: #a8b3cf;
   font-size: 14px;
 }
-
 
 .grid {
   display: grid;
@@ -247,9 +245,48 @@
   gap: 12px;
 }
 
+@media (max-width: 900px) {
+  .ctaRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .ctaTitle {
   margin: 0 0 6px;
   font-size: 14px;
+}
+
+.ctaActions {
+  display: grid;
+  gap: 10px;
+  min-width: 230px;
+}
+
+.primaryButton,
+.secondaryButton {
+  appearance: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 0;
+  background: #2563eb;
+  color: white;
+}
+
+.secondaryButton {
+  border: 1px solid #24314f;
+  background: rgba(15, 26, 48, 0.6);
+  color: #e5e7eb;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  filter: brightness(1.05);
 }
 
 .output {

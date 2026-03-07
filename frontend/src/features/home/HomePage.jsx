@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
-import Button from "../../shared/ui/Button";
 import { clearAccessToken } from "../../shared/auth/token";
 import { getMe, getAccounts } from "./api";
 import styles from "../../styles/HomePage.module.css";
@@ -77,7 +76,6 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   return (
     <div className={styles.page}>
       <Card className={styles.dashboardCard}>
@@ -97,7 +95,6 @@ export default function HomePage() {
 
           {!loading && !error && (
             <div className={styles.grid}>
-              {/* Profile */}
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <h2 className={styles.panelTitle}>Profile</h2>
@@ -128,12 +125,12 @@ export default function HomePage() {
 
                 {me?.role === "ADMIN" && (
                   <p className={styles.hint}>
-                    Admin tools will appear here soon (deposit, risk review, freeze/unfreeze).
+                    Admin review is now available from the navigation bar. You can review held
+                    transfers there.
                   </p>
                 )}
               </section>
 
-              {/* Accounts */}
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <h2 className={styles.panelTitle}>Accounts</h2>
@@ -179,14 +176,31 @@ export default function HomePage() {
 
                 <div className={styles.ctaRow}>
                   <div>
-                    <h3 className={styles.ctaTitle}>Next</h3>
+                    <h3 className={styles.ctaTitle}>Quick actions</h3>
                     <p className={styles.sub}>
-                      Transfers will live here next (with required Idempotency-Key).
+                      Manage payees, send transfers, and track activity from the main navigation.
                     </p>
                   </div>
-                  <Button type="button" disabled>
-                    Transfer money (coming soon)
-                  </Button>
+
+                  <div className={styles.ctaActions}>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      onClick={() => navigate("/transfer")}
+                    >
+                      Transfer money
+                    </button>
+
+                    {me?.role === "ADMIN" && (
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => navigate("/admin/risk")}
+                      >
+                        Open Admin Review
+                      </button>
+                    )}
+                  </div>
                 </div>
               </section>
             </div>

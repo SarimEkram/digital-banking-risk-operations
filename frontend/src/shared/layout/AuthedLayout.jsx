@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearAccessToken } from "../auth/token";
+import { apiRequest } from "../api/http";
 import styles from "../../styles/AuthedLayout.module.css";
 
 function linkClass({ isActive }) {
@@ -8,6 +10,33 @@ function linkClass({ isActive }) {
 
 export default function AuthedLayout() {
   const navigate = useNavigate();
+  const [role, setRole] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadMe() {
+      const res = await apiRequest("/api/me");
+
+      if (!alive) return;
+
+      if (res.ok) {
+        setRole(res.body?.role || "");
+        return;
+      }
+
+      if (res.status === 401) {
+        clearAccessToken();
+        navigate("/login", { replace: true });
+      }
+    }
+
+    loadMe();
+
+    return () => {
+      alive = false;
+    };
+  }, [navigate]);
 
   function onLogout() {
     clearAccessToken();
@@ -28,6 +57,11 @@ export default function AuthedLayout() {
             <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
             <NavLink to="/payees" className={linkClass}>Payees</NavLink>
             <NavLink to="/activity" className={linkClass}>Activity</NavLink>
+            {role === "ADMIN" && (
+              <NavLink to="/admin/risk" className={linkClass}>
+                Admin Review
+              </NavLink>
+            )}
           </nav>
 
           <button type="button" className={styles.logoutBtn} onClick={onLogout}>
