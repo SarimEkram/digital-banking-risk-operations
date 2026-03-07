@@ -78,7 +78,6 @@ public class TransferService {
 
         long amount = req.amountCents();
 
-        // 1) resolve payeeId -> payee row (must belong to the current user)
         PayeeEntity payee = payeeRepository.findByIdAndOwnerUser_Id(req.payeeId(), actorUserId)
                 .orElseThrow(() -> new IllegalArgumentException("payee not found"));
 
@@ -88,7 +87,6 @@ public class TransferService {
 
         Long payeeUserId = payee.getPayeeUser().getId();
 
-        // 2) find payee’s ACTIVE CHEQUING in the requested currency
         Long toAccountId = accountRepository
                 .findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(
                         payeeUserId,
@@ -103,7 +101,6 @@ public class TransferService {
             throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
         }
 
-        // idempotency check (SCOPED to actor)
         var existing = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
         if (existing.isPresent()) {
             TransferEntity t = existing.get();
@@ -120,7 +117,6 @@ public class TransferService {
             return toResponse(t, actorUserId);
         }
 
-        // If the key exists but doesn't belong to this actor, return a clean 409 (avoid leaking data)
         if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
@@ -128,7 +124,6 @@ public class TransferService {
             );
         }
 
-        // 3) lock both accounts
         List<Long> ids = List.of(req.fromAccountId(), toAccountId).stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
@@ -141,7 +136,6 @@ public class TransferService {
         AccountEntity from = locked.get(0).getId().equals(req.fromAccountId()) ? locked.get(0) : locked.get(1);
         AccountEntity to   = locked.get(0).getId().equals(toAccountId)          ? locked.get(0) : locked.get(1);
 
-        // 4) ownership + safety checks
         if (!from.getUser().getId().equals(actorUserId)) {
             throw new IllegalArgumentException("Account not found");
         }
@@ -164,7 +158,6 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient funds");
         }
 
-        // 5) create transfer
         boolean holdForReview = shouldHoldForReview(amount);
 
         TransferEntity t = holdForReview
@@ -233,15 +226,8 @@ public class TransferService {
             throw new IllegalArgumentException("amountCents must be > 0");
         }
 
-        // 1) resolve actor admin (for audit)
-        UserEntity adminActor = userRepository.findById(adminUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UserEntity adminActor = requireAdminActor(adminUserId);
 
-        if (adminActor.getRole() == null || !"ADMIN".equalsIgnoreCase(adminActor.getRole().name())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only");
-        }
-
-        // 2) resolve treasury/system user + ACTIVE CHEQUING CAD account
         UserEntity systemUser = userRepository.findByEmailIgnoreCase(SYSTEM_USER_EMAIL)
                 .orElseThrow(() -> new IllegalArgumentException("system user not found"));
 
@@ -259,7 +245,6 @@ public class TransferService {
             throw new IllegalArgumentException("toAccountId must be different from treasury account");
         }
 
-        // 3) idempotency check (global, because source account is treasury, not the admin actor)
         var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             TransferEntity t = existing.get();
@@ -273,11 +258,9 @@ public class TransferService {
                 );
             }
 
-            // Return from treasury perspective so direction is SENT
             return toResponse(t, systemUser.getId());
         }
 
-        // 4) lock treasury + destination account
         List<Long> ids = List.of(treasuryAccountId, req.toAccountId()).stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
@@ -290,7 +273,6 @@ public class TransferService {
         AccountEntity from = locked.get(0).getId().equals(treasuryAccountId) ? locked.get(0) : locked.get(1);
         AccountEntity to   = locked.get(0).getId().equals(req.toAccountId())  ? locked.get(0) : locked.get(1);
 
-        // 5) safety checks
         if (!from.getUser().getId().equals(systemUser.getId())) {
             throw new IllegalArgumentException("system treasury account not found");
         }
@@ -317,7 +299,6 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient treasury funds");
         }
 
-        // 6) create transfer
         TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
         SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
@@ -335,9 +316,8 @@ public class TransferService {
 
         applyLedgerAndBalances(t, from, to, amount, CAD);
 
-        // 9) audit
         AuditLogEntity log = new AuditLogEntity();
-        log.setActorUser(adminActor); // actual admin who initiated the deposit
+        log.setActorUser(adminActor);
         log.setAction("ADMIN_DEPOSIT");
         log.setEntityType("transfer");
         log.setEntityId(String.valueOf(t.getId()));
@@ -347,7 +327,6 @@ public class TransferService {
                 + ", currency=" + CAD);
         auditLogRepository.save(log);
 
-        // Return from treasury perspective so UI direction becomes SENT
         return toResponse(t, systemUser.getId());
     }
 
@@ -360,7 +339,7 @@ public class TransferService {
         if (cursor == null || cursor.isBlank()) {
             page = transferRepository.findFirstPageForUser(actorUserId, pageable);
         } else {
-            long[] decoded = decodeCursor(cursor); // [createdAtMillis, id]
+            long[] decoded = decodeCursor(cursor);
             Instant beforeCreatedAt = Instant.ofEpochMilli(decoded[0]);
             long beforeId = decoded[1];
 
@@ -376,6 +355,114 @@ public class TransferService {
 
         var items = page.stream().map(t -> toResponse(t, actorUserId)).toList();
         return new TransferPageResponse(items, nextCursor);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransferResponse> listHeldTransfers(Long adminUserId) {
+        requireAdminActor(adminUserId);
+
+        return transferRepository.findByStatusOrderByCreatedAtAsc(TransferStatus.PENDING_REVIEW)
+                .stream()
+                .map(t -> toResponse(t, null))
+                .toList();
+    }
+
+    // TODO: Replace user-facing TransferResponse for admin review endpoints with a dedicated admin DTO.
+    // Admin actions currently return toResponse(t, null), which makes direction = "UNKNOWN"
+    // and counterpartyEmail = null because there is no sender/recipient actor perspective.
+    // Later, create an admin-specific response shape with fields like fromEmail, toEmail,
+    // status, riskDecision, riskReasons, reviewedBy, and review outcome details.
+    @Transactional
+    public TransferResponse approveHeldTransfer(Long adminUserId, Long transferId) {
+        UserEntity adminActor = requireAdminActor(adminUserId);
+        TransferEntity t = requirePendingTransferForUpdate(transferId);
+
+        List<Long> ids = List.of(t.getFromAccount().getId(), t.getToAccount().getId()).stream()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+
+        List<AccountEntity> locked = accountRepository.findByIdInForUpdate(ids);
+        if (locked.size() != 2) {
+            throw new IllegalArgumentException("Account not found");
+        }
+
+        AccountEntity from = locked.get(0).getId().equals(t.getFromAccount().getId()) ? locked.get(0) : locked.get(1);
+        AccountEntity to   = locked.get(0).getId().equals(t.getToAccount().getId())   ? locked.get(0) : locked.get(1);
+
+        if (!t.getCurrency().equalsIgnoreCase(from.getCurrency()) || !t.getCurrency().equalsIgnoreCase(to.getCurrency())) {
+            throw new IllegalArgumentException("currency must match both accounts");
+        }
+
+        if (!"ACTIVE".equalsIgnoreCase(to.getStatus())) {
+            throw new IllegalArgumentException("To account is not active");
+        }
+
+        applyHeldTransferApprovalCredit(t, to, t.getAmountCents(), t.getCurrency());
+
+        t.setStatus(TransferStatus.COMPLETED);
+        t.setRiskDecision("APPROVE");
+        transferRepository.save(t);
+
+        AuditLogEntity log = new AuditLogEntity();
+        log.setActorUser(adminActor);
+        log.setAction("TRANSFER_APPROVE");
+        log.setEntityType("transfer");
+        log.setEntityId(String.valueOf(t.getId()));
+        log.setDetails("to=" + to.getId()
+                + ", amount_cents=" + t.getAmountCents()
+                + ", currency=" + t.getCurrency());
+
+        auditLogRepository.save(log);
+
+        return toResponse(t, null);
+    }
+
+    // TODO: Replace user-facing TransferResponse for admin review endpoints with a dedicated admin DTO.
+    // Admin actions currently return toResponse(t, null), which makes direction = "UNKNOWN"
+    // and counterpartyEmail = null because there is no sender/recipient actor perspective.
+    // Later, create an admin-specific response shape with fields like fromEmail, toEmail,
+    // status, riskDecision, riskReasons, reviewedBy, and review outcome details.
+
+    @Transactional
+    public TransferResponse rejectHeldTransfer(Long adminUserId, Long transferId, String reason) {
+        UserEntity adminActor = requireAdminActor(adminUserId);
+        TransferEntity t = requirePendingTransferForUpdate(transferId);
+
+        List<Long> ids = List.of(t.getFromAccount().getId(), t.getToAccount().getId()).stream()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+
+        List<AccountEntity> locked = accountRepository.findByIdInForUpdate(ids);
+        if (locked.size() != 2) {
+            throw new IllegalArgumentException("Account not found");
+        }
+
+        AccountEntity from = locked.get(0).getId().equals(t.getFromAccount().getId()) ? locked.get(0) : locked.get(1);
+
+        applyHeldTransferRefund(t, from, t.getAmountCents(), t.getCurrency());
+
+        String finalReason = (reason == null || reason.isBlank())
+                ? "rejected during manual review"
+                : reason.trim();
+
+        t.setStatus(TransferStatus.REJECTED);
+        t.setRiskDecision("BLOCK");
+        t.setRiskReasons(finalReason);
+        transferRepository.save(t);
+
+        AuditLogEntity log = new AuditLogEntity();
+        log.setActorUser(adminActor);
+        log.setAction("TRANSFER_REJECT");
+        log.setEntityType("transfer");
+        log.setEntityId(String.valueOf(t.getId()));
+        log.setDetails("from=" + from.getId()
+                + ", amount_cents=" + t.getAmountCents()
+                + ", currency=" + t.getCurrency()
+                + ", reason=" + finalReason);
+
+        auditLogRepository.save(log);
+
+        return toResponse(t, null);
     }
 
     private String encodeCursor(Instant createdAt, Long id) {
@@ -394,6 +481,31 @@ public class TransferService {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid cursor");
         }
+    }
+
+    private UserEntity requireAdminActor(Long adminUserId) {
+        UserEntity adminActor = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (adminActor.getRole() == null || !"ADMIN".equalsIgnoreCase(adminActor.getRole().name())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only");
+        }
+
+        return adminActor;
+    }
+
+    private TransferEntity requirePendingTransferForUpdate(Long transferId) {
+        TransferEntity t = transferRepository.findByIdForUpdate(transferId)
+                .orElseThrow(() -> new IllegalArgumentException("transfer not found"));
+
+        if (t.getStatus() != TransferStatus.PENDING_REVIEW) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "transfer is not pending review"
+            );
+        }
+
+        return t;
     }
 
     private boolean shouldHoldForReview(long amountCents) {
@@ -452,6 +564,44 @@ public class TransferService {
         ledgerEntryRepository.save(debit);
 
         from.setBalanceCents(from.getBalanceCents() - amountCents);
+        accountRepository.save(from);
+    }
+
+    private void applyHeldTransferApprovalCredit(
+            TransferEntity transfer,
+            AccountEntity to,
+            long amountCents,
+            String currency
+    ) {
+        LedgerEntryEntity credit = new LedgerEntryEntity();
+        credit.setTransfer(transfer);
+        credit.setAccount(to);
+        credit.setDirection(LedgerDirection.CREDIT);
+        credit.setAmountCents(amountCents);
+        credit.setCurrency(currency);
+
+        ledgerEntryRepository.save(credit);
+
+        to.setBalanceCents(to.getBalanceCents() + amountCents);
+        accountRepository.save(to);
+    }
+
+    private void applyHeldTransferRefund(
+            TransferEntity transfer,
+            AccountEntity from,
+            long amountCents,
+            String currency
+    ) {
+        LedgerEntryEntity refund = new LedgerEntryEntity();
+        refund.setTransfer(transfer);
+        refund.setAccount(from);
+        refund.setDirection(LedgerDirection.CREDIT);
+        refund.setAmountCents(amountCents);
+        refund.setCurrency(currency);
+
+        ledgerEntryRepository.save(refund);
+
+        from.setBalanceCents(from.getBalanceCents() + amountCents);
         accountRepository.save(from);
     }
 

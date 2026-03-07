@@ -1,7 +1,9 @@
 package com.sarim.digitalbanking.transfers;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,13 +15,20 @@ public interface TransferRepository extends JpaRepository<TransferEntity, Long> 
 
     Optional<TransferEntity> findByIdempotencyKey(String idempotencyKey);
 
-    // scoped replay: only allow returning an existing transfer if it belongs to the actor
     Optional<TransferEntity> findByIdempotencyKeyAndFromAccount_User_Id(String idempotencyKey, Long actorUserId);
 
-    // used to detect "key exists but not for you" and return 409 cleanly
     boolean existsByIdempotencyKey(String idempotencyKey);
 
-    // FIRST PAGE (no cursor) — avoid null param typing issues in Postgres
+    List<TransferEntity> findByStatusOrderByCreatedAtAsc(TransferStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select t
+        from TransferEntity t
+        where t.id = :id
+    """)
+    Optional<TransferEntity> findByIdForUpdate(@Param("id") Long id);
+
     @Query("""
         select t
         from TransferEntity t
@@ -31,7 +40,6 @@ public interface TransferRepository extends JpaRepository<TransferEntity, Long> 
             Pageable pageable
     );
 
-    // CURSOR PAGE — only called when cursor exists (params never null)
     @Query("""
         select t
         from TransferEntity t
