@@ -1,5 +1,5 @@
 import { apiRequest } from "../../shared/api/http";
-
+// api.js for admin-risk
 function buildError(status, body) {
   const msg =
     typeof body === "string"
