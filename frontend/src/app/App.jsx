@@ -10,6 +10,7 @@ import TransferPage from "../features/transfer/TransferPage.jsx";
 import PayeesPage from "../features/payees/PayeesPage.jsx";
 import ActivityPage from "../features/activity/ActivityPage.jsx";
 import AdminRiskPage from "../features/admin-risk/AdminRiskPage.jsx";
+import AdminDepositPage from "../features/admin-deposit/AdminDepositPage.jsx";
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="transfer" element={<TransferPage />} />
         <Route path="payees" element={<PayeesPage />} />
         <Route path="activity" element={<ActivityPage />} />
+        <Route path="admin/deposit" element={<AdminDepositPage />} />
         <Route path="admin/risk" element={<AdminRiskPage />} />
       </Route>
 

@@ -57,10 +57,17 @@ export default function AuthedLayout() {
             <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
             <NavLink to="/payees" className={linkClass}>Payees</NavLink>
             <NavLink to="/activity" className={linkClass}>Activity</NavLink>
+
             {role === "ADMIN" && (
-              <NavLink to="/admin/risk" className={linkClass}>
-                Admin Review
-              </NavLink>
+              <>
+                <NavLink to="/admin/deposit" className={linkClass}>
+                  Admin Deposit
+                </NavLink>
+
+                <NavLink to="/admin/risk" className={linkClass}>
+                  Admin Review
+                </NavLink>
+              </>
             )}
           </nav>
 
