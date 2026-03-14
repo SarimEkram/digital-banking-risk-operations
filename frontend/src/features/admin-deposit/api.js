@@ -20,6 +20,20 @@ function makeIdempotencyKey() {
   return `admin-deposit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+export async function lookupAdminDepositAccount(email) {
+  const trimmed = String(email || "").trim();
+
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/deposit/lookup?email=${encodeURIComponent(trimmed)}`
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
 export async function createAdminDeposit({ toAccountId, amountCents }) {
   const idempotencyKey = makeIdempotencyKey();
 

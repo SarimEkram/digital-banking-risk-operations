@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
 import { apiRequest } from "../../shared/api/http";
 import { clearAccessToken } from "../../shared/auth/token";
-import { createAdminDeposit } from "./api";
+import { createAdminDeposit, lookupAdminDepositAccount } from "./api";
 import styles from "../../styles/AdminDepositPage.module.css";
 
 function formatMoney(amountCents, currency = "CAD") {
@@ -56,7 +56,10 @@ export default function AdminDepositPage() {
   const navigate = useNavigate();
 
   const [checkingRole, setCheckingRole] = useState(true);
-  const [toAccountId, setToAccountId] = useState("");
+  const [lookupEmail, setLookupEmail] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -105,6 +108,45 @@ export default function AdminDepositPage() {
     return Math.round(Number(trimmed) * 100);
   }, [amount]);
 
+  async function onLookup(e) {
+    e.preventDefault();
+
+    setError("");
+    setSuccess("");
+    setLastDeposit(null);
+    setLastIdempotencyKey("");
+
+    const trimmed = String(lookupEmail || "").trim();
+    if (!trimmed) {
+      setError("Enter an email to look up an account.");
+      return;
+    }
+
+    setLookupLoading(true);
+
+    try {
+      const result = await lookupAdminDepositAccount(trimmed);
+      setSelectedAccount(result);
+      setSuccess(`Resolved ${result.email} to account ${result.accountId}.`);
+    } catch (err) {
+      if (err?.status === 401) {
+        clearAccessToken();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      if (err?.status === 403) {
+        navigate("/home", { replace: true });
+        return;
+      }
+
+      setSelectedAccount(null);
+      setError(err?.message || "Failed to look up account by email.");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
 
@@ -113,16 +155,14 @@ export default function AdminDepositPage() {
     setLastDeposit(null);
     setLastIdempotencyKey("");
 
-    let parsedAccountId;
+    if (!selectedAccount?.accountId) {
+      setError("Look up a valid email before submitting the deposit.");
+      return;
+    }
+
     let amountCents;
 
     try {
-      parsedAccountId = Number.parseInt(String(toAccountId || "").trim(), 10);
-
-      if (!Number.isFinite(parsedAccountId) || parsedAccountId <= 0) {
-        throw new Error("To Account ID must be a positive whole number.");
-      }
-
       amountCents = parseAmountToCents(amount);
     } catch (err) {
       setError(err.message || "Invalid form input.");
@@ -133,14 +173,14 @@ export default function AdminDepositPage() {
 
     try {
       const result = await createAdminDeposit({
-        toAccountId: parsedAccountId,
+        toAccountId: selectedAccount.accountId,
         amountCents,
       });
 
       setLastDeposit(result.data);
       setLastIdempotencyKey(result.idempotencyKey);
       setSuccess(
-        `Deposit completed successfully for account ${parsedAccountId}.`
+        `Deposit completed successfully for ${selectedAccount.email} (account ${selectedAccount.accountId}).`
       );
       setAmount("");
     } catch (err) {
@@ -161,6 +201,13 @@ export default function AdminDepositPage() {
     }
   }
 
+  function onChangeEmail(value) {
+    setLookupEmail(value);
+    setSelectedAccount(null);
+    setError("");
+    setSuccess("");
+  }
+
   if (checkingRole) {
     return (
       <div className={styles.page}>
@@ -179,24 +226,91 @@ export default function AdminDepositPage() {
           <div>
             <h1 className={styles.title}>Admin Deposit</h1>
             <p className={styles.sub}>
-              Fund a customer account from treasury for testing and demos.
+              Look up a customer by email, resolve their active CAD chequing account,
+              and fund it from treasury.
             </p>
           </div>
         </div>
 
-        <form className={styles.form} onSubmit={onSubmit}>
+        <form className={styles.lookupForm} onSubmit={onLookup}>
           <label className={styles.field}>
-            <span className={styles.label}>To Account ID</span>
+            <span className={styles.label}>Customer email</span>
             <input
               className={styles.input}
-              type="number"
-              min="1"
-              step="1"
-              inputMode="numeric"
-              value={toAccountId}
-              onChange={(e) => setToAccountId(e.target.value)}
-              placeholder="e.g. 5"
-              disabled={submitting}
+              type="email"
+              value={lookupEmail}
+              onChange={(e) => onChangeEmail(e.target.value)}
+              placeholder="e.g. user@example.com"
+              disabled={lookupLoading || submitting}
+            />
+          </label>
+
+          <div className={styles.lookupActions}>
+            <button
+              type="submit"
+              className={styles.secondaryButton}
+              disabled={lookupLoading || submitting}
+            >
+              {lookupLoading ? "Looking up..." : "Find Account"}
+            </button>
+          </div>
+        </form>
+
+        {selectedAccount && (
+          <section className={styles.lookupResultCard}>
+            <div className={styles.resultHeader}>
+              <h2 className={styles.resultTitle}>Resolved Account</h2>
+            </div>
+
+            <div className={styles.resultGrid}>
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>Email</div>
+                <div className={styles.detailValue}>{selectedAccount.email}</div>
+              </div>
+
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>User ID</div>
+                <div className={styles.detailValue}>{selectedAccount.userId}</div>
+              </div>
+
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>Account ID</div>
+                <div className={styles.detailValue}>{selectedAccount.accountId}</div>
+              </div>
+
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>Status</div>
+                <div className={styles.detailValue}>{selectedAccount.status}</div>
+              </div>
+
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>Currency</div>
+                <div className={styles.detailValue}>{selectedAccount.currency}</div>
+              </div>
+
+              <div className={styles.detailBox}>
+                <div className={styles.detailLabel}>Current balance</div>
+                <div className={styles.detailValue}>
+                  {formatMoney(selectedAccount.balanceCents, selectedAccount.currency)}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <form className={styles.form} onSubmit={onSubmit}>
+          <label className={styles.field}>
+            <span className={styles.label}>Selected account</span>
+            <input
+              className={styles.input}
+              type="text"
+              value={
+                selectedAccount
+                  ? `${selectedAccount.email} • account ${selectedAccount.accountId}`
+                  : ""
+              }
+              placeholder="lookup required before deposit"
+              disabled
             />
           </label>
 
@@ -224,7 +338,7 @@ export default function AdminDepositPage() {
             <button
               type="submit"
               className={styles.primaryButton}
-              disabled={submitting}
+              disabled={submitting || !selectedAccount}
             >
               {submitting ? "Depositing..." : "Submit Deposit"}
             </button>
@@ -235,7 +349,7 @@ export default function AdminDepositPage() {
         {success && <div className={styles.successBox}>{success}</div>}
 
         {lastDeposit && (
-          <section className={styles.resultCard}>
+          <section className={styles.lookupResultCard}>
             <div className={styles.resultHeader}>
               <h2 className={styles.resultTitle}>Last Deposit Result</h2>
             </div>
@@ -265,16 +379,12 @@ export default function AdminDepositPage() {
 
               <div className={styles.detailBox}>
                 <div className={styles.detailLabel}>From Email</div>
-                <div className={styles.detailValue}>
-                  {lastDeposit.fromEmail || "-"}
-                </div>
+                <div className={styles.detailValue}>{lastDeposit.fromEmail || "-"}</div>
               </div>
 
               <div className={styles.detailBox}>
                 <div className={styles.detailLabel}>To Email</div>
-                <div className={styles.detailValue}>
-                  {lastDeposit.toEmail || "-"}
-                </div>
+                <div className={styles.detailValue}>{lastDeposit.toEmail || "-"}</div>
               </div>
 
               <div className={styles.detailBox}>
