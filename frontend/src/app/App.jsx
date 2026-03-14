@@ -3,6 +3,7 @@ import RegisterPage from "../features/auth/RegisterPage.jsx";
 import LoginPage from "../features/auth/LoginPage.jsx";
 import HomePage from "../features/home/HomePage.jsx";
 import RequireAuth from "../shared/routing/RequireAuth.jsx";
+import RequireAdmin from "../shared/routing/RequireAdmin.jsx";
 import { hasAccessToken } from "../shared/auth/token";
 
 import AuthedLayout from "../shared/layout/AuthedLayout.jsx";
@@ -34,8 +35,24 @@ export default function App() {
         <Route path="transfer" element={<TransferPage />} />
         <Route path="payees" element={<PayeesPage />} />
         <Route path="activity" element={<ActivityPage />} />
-        <Route path="admin/deposit" element={<AdminDepositPage />} />
-        <Route path="admin/risk" element={<AdminRiskPage />} />
+
+        <Route
+          path="admin/deposit"
+          element={
+            <RequireAdmin>
+              <AdminDepositPage />
+            </RequireAdmin>
+          }
+        />
+
+        <Route
+          path="admin/risk"
+          element={
+            <RequireAdmin>
+              <AdminRiskPage />
+            </RequireAdmin>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
