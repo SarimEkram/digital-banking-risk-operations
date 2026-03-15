@@ -16,18 +16,27 @@ export default function AuthedLayout() {
     let alive = true;
 
     async function loadMe() {
-      const res = await apiRequest("/api/me");
+      try {
+        const res = await apiRequest("/api/me");
 
-      if (!alive) return;
+        if (!alive) return;
 
-      if (res.ok) {
-        setRole(res.body?.role || "");
-        return;
-      }
+        if (res.ok) {
+          setRole(res.body?.role || "");
+          return;
+        }
 
-      if (res.status === 401) {
-        clearAccessToken();
-        navigate("/login", { replace: true });
+        if (res.status === 401) {
+          clearAccessToken();
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        setRole("");
+      } catch {
+        if (alive) {
+          setRole("");
+        }
       }
     }
 
