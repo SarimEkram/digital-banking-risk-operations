@@ -204,7 +204,7 @@ public class TransferService {
 
             auditLogRepository.save(log);
 
-            transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), riskEvaluatedAt);
+            transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
             return toResponse(t, actorUserId);
         }
@@ -224,7 +224,7 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), riskEvaluatedAt);
+        transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
         return toResponse(t, actorUserId);
     }
@@ -522,35 +522,62 @@ public class TransferService {
         boolean amountHold = amountCents >= RISK_HOLD_THRESHOLD_CENTS;
 
         TransferVelocityRiskService.VelocitySnapshot velocitySnapshot =
-                transferVelocityRiskService.getSnapshot(actorUserId, now);
+                transferVelocityRiskService.getSnapshot(actorUserId, amountCents, now);
 
-        boolean velocityHold = velocitySnapshot.hold();
+        boolean cumulativeHold = velocitySnapshot.hold();
 
-        if (!amountHold && !velocityHold) {
+        boolean existingPendingHold =
+                transferRepository.existsByFromAccount_User_IdAndStatus(actorUserId, TransferStatus.PENDING_REVIEW);
+
+        if (!amountHold && !cumulativeHold && !existingPendingHold) {
             return new RiskHoldDecision(false, null, null);
         }
 
         StringBuilder reason = new StringBuilder();
 
         if (amountHold) {
-            reason.append("amount threshold exceeded");
+            reason.append("single transfer amount meets or exceeds $5,000");
         }
 
-        if (velocityHold) {
+        if (cumulativeHold) {
             if (reason.length() > 0) {
                 reason.append("; ");
             }
             reason.append(velocitySnapshot.reason());
         }
 
-        Integer score;
-        if (amountHold && velocityHold) {
-            score = 95;
-        } else if (amountHold) {
-            score = 90;
-        } else {
-            score = velocitySnapshot.score();
+        if (existingPendingHold) {
+            if (reason.length() > 0) {
+                reason.append("; ");
+            }
+            reason.append("existing outgoing transfer is still pending review");
         }
+
+        int score = 0;
+        int triggerCount = 0;
+
+        if (amountHold) {
+            score = Math.max(score, 90);
+            triggerCount++;
+        }
+
+        if (cumulativeHold) {
+            score = Math.max(score, velocitySnapshot.score() == null ? 85 : velocitySnapshot.score());
+            triggerCount++;
+        }
+
+        if (existingPendingHold) {
+            score = Math.max(score, 95);
+            triggerCount++;
+        }
+
+        if (triggerCount >= 2) {
+            score = Math.min(99, score + 3);
+        }
+
+        // TODO: Future implementation:
+        // add automated review / AI-assisted risk scoring so low-risk holds can be auto-cleared
+        // within a short review window instead of always requiring manual admin action.
 
         return new RiskHoldDecision(true, reason.toString(), score);
     }

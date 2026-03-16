@@ -19,6 +19,8 @@ public interface TransferRepository extends JpaRepository<TransferEntity, Long> 
 
     boolean existsByIdempotencyKey(String idempotencyKey);
 
+    boolean existsByFromAccount_User_IdAndStatus(Long actorUserId, TransferStatus status);
+
     List<TransferEntity> findByStatusOrderByCreatedAtAsc(TransferStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
