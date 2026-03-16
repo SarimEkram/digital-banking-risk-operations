@@ -38,7 +38,7 @@ public class TransferService {
 
     private static final String SYSTEM_USER_EMAIL = "system@bank.local";
     private static final String CAD = "CAD";
-    private static final long RISK_HOLD_THRESHOLD_CENTS = 100_000; // $1000.00
+    private static final long RISK_HOLD_THRESHOLD_CENTS = 500_000; // $5000.00
 
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
@@ -47,6 +47,7 @@ public class TransferService {
     private final UserRepository userRepository;
     private final PayeeRepository payeeRepository;
     private final EntityManager entityManager;
+    private final TransferVelocityRiskService transferVelocityRiskService;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -55,7 +56,8 @@ public class TransferService {
             AuditLogRepository auditLogRepository,
             UserRepository userRepository,
             PayeeRepository payeeRepository,
-            EntityManager entityManager
+            EntityManager entityManager,
+            TransferVelocityRiskService transferVelocityRiskService
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -64,6 +66,7 @@ public class TransferService {
         this.userRepository = userRepository;
         this.payeeRepository = payeeRepository;
         this.entityManager = entityManager;
+        this.transferVelocityRiskService = transferVelocityRiskService;
     }
 
     @Transactional
@@ -158,10 +161,13 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient funds");
         }
 
-        boolean holdForReview = shouldHoldForReview(amount);
+        Instant riskEvaluatedAt = Instant.now();
+        RiskHoldDecision riskHoldDecision = evaluateRiskHoldDecision(actorUserId, amount, riskEvaluatedAt);
+
+        boolean holdForReview = riskHoldDecision.hold();
 
         TransferEntity t = holdForReview
-                ? newHeldTransfer(from, to, amount, currency, idempotencyKey)
+                ? newHeldTransfer(from, to, amount, currency, idempotencyKey, riskHoldDecision)
                 : newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
         SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
@@ -193,10 +199,12 @@ public class TransferService {
                     + ", to=" + to.getId()
                     + ", amount_cents=" + amount
                     + ", currency=" + currency
-                    + ", reason=amount threshold exceeded"
+                    + ", reason=" + riskHoldDecision.reason()
                     + ", funds_reserved=true");
 
             auditLogRepository.save(log);
+
+            transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), riskEvaluatedAt);
 
             return toResponse(t, actorUserId);
         }
@@ -215,6 +223,8 @@ public class TransferService {
                 + ", currency=" + currency);
 
         auditLogRepository.save(log);
+
+        transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), riskEvaluatedAt);
 
         return toResponse(t, actorUserId);
     }
@@ -508,8 +518,41 @@ public class TransferService {
         return t;
     }
 
-    private boolean shouldHoldForReview(long amountCents) {
-        return amountCents >= RISK_HOLD_THRESHOLD_CENTS;
+    private RiskHoldDecision evaluateRiskHoldDecision(Long actorUserId, long amountCents, Instant now) {
+        boolean amountHold = amountCents >= RISK_HOLD_THRESHOLD_CENTS;
+
+        TransferVelocityRiskService.VelocitySnapshot velocitySnapshot =
+                transferVelocityRiskService.getSnapshot(actorUserId, now);
+
+        boolean velocityHold = velocitySnapshot.hold();
+
+        if (!amountHold && !velocityHold) {
+            return new RiskHoldDecision(false, null, null);
+        }
+
+        StringBuilder reason = new StringBuilder();
+
+        if (amountHold) {
+            reason.append("amount threshold exceeded");
+        }
+
+        if (velocityHold) {
+            if (reason.length() > 0) {
+                reason.append("; ");
+            }
+            reason.append(velocitySnapshot.reason());
+        }
+
+        Integer score;
+        if (amountHold && velocityHold) {
+            score = 95;
+        } else if (amountHold) {
+            score = 90;
+        } else {
+            score = velocitySnapshot.score();
+        }
+
+        return new RiskHoldDecision(true, reason.toString(), score);
     }
 
     private TransferEntity newHeldTransfer(
@@ -517,7 +560,8 @@ public class TransferService {
             AccountEntity to,
             long amountCents,
             String currency,
-            String idempotencyKey
+            String idempotencyKey,
+            RiskHoldDecision riskHoldDecision
     ) {
         TransferEntity t = new TransferEntity();
         t.setFromAccount(from);
@@ -526,7 +570,8 @@ public class TransferService {
         t.setCurrency(currency);
         t.setStatus(TransferStatus.PENDING_REVIEW);
         t.setRiskDecision("HOLD");
-        t.setRiskReasons("amount threshold exceeded");
+        t.setRiskScore(riskHoldDecision.score());
+        t.setRiskReasons(riskHoldDecision.reason());
         t.setIdempotencyKey(idempotencyKey);
         return t;
     }
@@ -681,6 +726,8 @@ public class TransferService {
         }
     }
 
+    private record RiskHoldDecision(boolean hold, String reason, Integer score) {}
+
     private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
@@ -708,6 +755,9 @@ public class TransferService {
                 t.getAmountCents(),
                 t.getCurrency(),
                 t.getStatus().name(),
+                t.getRiskDecision(),
+                t.getRiskScore(),
+                t.getRiskReasons(),
                 t.getCreatedAt(),
                 fromEmail,
                 toEmail,
