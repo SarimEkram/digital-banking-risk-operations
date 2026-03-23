@@ -63,8 +63,14 @@ export default function AuthedLayout() {
 
           <nav className={styles.navLinks} aria-label="Primary">
             <NavLink to="/home" className={linkClass}>Home</NavLink>
-            <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
-            <NavLink to="/payees" className={linkClass}>Payees</NavLink>
+
+            {role !== "ADMIN" && (
+              <>
+                <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
+                <NavLink to="/payees" className={linkClass}>Payees</NavLink>
+              </>
+            )}
+
             <NavLink to="/activity" className={linkClass}>Activity</NavLink>
 
             {role === "ADMIN" && (
