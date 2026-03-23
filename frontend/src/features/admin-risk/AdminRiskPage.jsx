@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
 import { clearAccessToken } from "../../shared/auth/token";
@@ -33,6 +33,32 @@ function formatDateTime(iso) {
   } catch {
     return iso || "-";
   }
+}
+
+function getRiskScoreTone(score) {
+  const value = Number(score ?? 0);
+
+  if (value >= 95) return styles.riskCritical;
+  if (value >= 85) return styles.riskHigh;
+  if (value >= 70) return styles.riskMedium;
+  return styles.riskLow;
+}
+
+function getRiskScoreLabel(score) {
+  const value = Number(score ?? 0);
+
+  if (value >= 95) return "Critical";
+  if (value >= 85) return "High";
+  if (value >= 70) return "Medium";
+  if (value > 0) return "Low";
+  return "Unscored";
+}
+
+function splitReasons(text) {
+  return String(text || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 export default function AdminRiskPage() {
@@ -135,6 +161,10 @@ export default function AdminRiskPage() {
     }
   }
 
+  const totalHeldAmount = useMemo(() => {
+    return items.reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+  }, [items]);
+
   return (
     <div className={styles.page}>
       <Card className={styles.card}>
@@ -142,7 +172,7 @@ export default function AdminRiskPage() {
           <div>
             <h1 className={styles.title}>Admin Review</h1>
             <p className={styles.sub}>
-              Review held transfers, approve settlement, or reject and refund the sender.
+              Review held transfers, inspect the risk reason, then approve settlement or reject and refund the sender.
             </p>
           </div>
 
@@ -156,11 +186,29 @@ export default function AdminRiskPage() {
           </button>
         </div>
 
+        {!loading && !error && items.length > 0 && (
+          <div className={styles.summaryRow}>
+            <div className={styles.summaryBox}>
+              <div className={styles.summaryLabel}>Held transfers</div>
+              <div className={styles.summaryValue}>{items.length}</div>
+            </div>
+
+            <div className={styles.summaryBox}>
+              <div className={styles.summaryLabel}>Total held amount</div>
+              <div className={styles.summaryValue}>
+                {formatMoney(totalHeldAmount, "CAD")}
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading && <p className={styles.sub}>Loading held transfers...</p>}
 
         {!loading && error && <div className={styles.errorBox}>{error}</div>}
 
-        {!loading && !error && success && <div className={styles.successBox}>{success}</div>}
+        {!loading && !error && success && (
+          <div className={styles.successBox}>{success}</div>
+        )}
 
         {!loading && !error && items.length === 0 && (
           <div className={styles.emptyState}>
@@ -173,6 +221,7 @@ export default function AdminRiskPage() {
             {items.map((item) => {
               const approveBusy = busyKey === `approve-${item.id}`;
               const rejectBusy = busyKey === `reject-${item.id}`;
+              const riskReasons = splitReasons(item.riskReasons);
 
               return (
                 <section className={styles.transferCard} key={item.id}>
@@ -184,13 +233,60 @@ export default function AdminRiskPage() {
                       </div>
                     </div>
 
-                    <div className={`${styles.statusPill} ${styles.pendingPill}`}>
-                      {item.status}
+                    <div className={styles.pillGroup}>
+                      <div className={`${styles.statusPill} ${styles.pendingPill}`}>
+                        {item.status}
+                      </div>
+
+                      <div className={`${styles.statusPill} ${styles.holdPill}`}>
+                        {item.riskDecision || "HOLD"}
+                      </div>
                     </div>
                   </div>
 
                   <div className={styles.amountRow}>
                     {formatMoney(item.amountCents, item.currency)}
+                  </div>
+
+                  <div className={styles.riskPanel}>
+                    <div className={styles.riskPanelHeader}>Risk review details</div>
+
+                    <div className={styles.riskGrid}>
+                      <div className={styles.riskBox}>
+                        <div className={styles.detailLabel}>Risk score</div>
+                        <div className={styles.riskScoreRow}>
+                          <span
+                            className={`${styles.scoreBadge} ${getRiskScoreTone(item.riskScore)}`}
+                          >
+                            {item.riskScore ?? "-"}
+                          </span>
+                          <span className={styles.scoreLabel}>
+                            {getRiskScoreLabel(item.riskScore)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={styles.riskBox}>
+                        <div className={styles.detailLabel}>Risk decision</div>
+                        <div className={styles.detailValue}>
+                          {item.riskDecision || "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.reasonPanel}>
+                      <div className={styles.detailLabel}>Why this was held</div>
+
+                      {riskReasons.length > 0 ? (
+                        <ul className={styles.reasonList}>
+                          {riskReasons.map((reason, index) => (
+                            <li key={`${item.id}-reason-${index}`}>{reason}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className={styles.detailValue}>No risk reason provided.</div>
+                      )}
+                    </div>
                   </div>
 
                   <div className={styles.detailsGrid}>
