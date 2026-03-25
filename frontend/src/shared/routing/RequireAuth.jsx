@@ -26,16 +26,17 @@ export default function RequireAuth({ children }) {
           return;
         }
 
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 403) {
           clearAccessToken();
           setStatus("unauthenticated");
           return;
         }
 
-        setStatus("authenticated");
+        setStatus("unauthenticated");
       } catch {
         if (alive) {
-          setStatus("authenticated");
+          clearAccessToken();
+          setStatus("unauthenticated");
         }
       }
     }

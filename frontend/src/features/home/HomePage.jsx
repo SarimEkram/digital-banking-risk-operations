@@ -44,31 +44,37 @@ export default function HomePage() {
     setLoading(true);
     setError("");
 
-    const [meRes, accRes] = await Promise.all([getMe(), getAccounts()]);
+    try {
+      const [meRes, accRes] = await Promise.all([getMe(), getAccounts()]);
 
-    if (!meRes.ok && meRes.status === 401) {
-      clearAccessToken();
-      navigate("/login", { replace: true });
-      return;
-    }
-    if (!accRes.ok && accRes.status === 401) {
-      clearAccessToken();
-      navigate("/login", { replace: true });
-      return;
-    }
+      const authFailed =
+        (!meRes.ok && (meRes.status === 401 || meRes.status === 403)) ||
+        (!accRes.ok && (accRes.status === 401 || accRes.status === 403));
 
-    if (!meRes.ok || !accRes.ok) {
-      const which = !meRes.ok ? "/api/me" : "/api/accounts";
-      const bad = !meRes.ok ? meRes : accRes;
-      const errText = typeof bad.body === "string" ? bad.body : JSON.stringify(bad.body, null, 2);
-      setError(`Failed to load ${which} (${bad.status})\n\n${errText}`);
+      if (authFailed) {
+        clearAccessToken();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      if (!meRes.ok || !accRes.ok) {
+        const which = !meRes.ok ? "/api/me" : "/api/accounts";
+        const bad = !meRes.ok ? meRes : accRes;
+        const errText =
+          typeof bad.body === "string" ? bad.body : JSON.stringify(bad.body, null, 2);
+
+        setError(`Failed to load ${which} (${bad.status})\n\n${errText}`);
+        setLoading(false);
+        return;
+      }
+
+      setMe(meRes.body);
+      setAccounts(Array.isArray(accRes.body) ? accRes.body : []);
       setLoading(false);
-      return;
+    } catch {
+      clearAccessToken();
+      navigate("/login", { replace: true });
     }
-
-    setMe(meRes.body);
-    setAccounts(Array.isArray(accRes.body) ? accRes.body : []);
-    setLoading(false);
   }
 
   useEffect(() => {

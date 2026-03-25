@@ -16,27 +16,34 @@ export default function RequireAdmin({ children }) {
         return;
       }
 
-      const res = await apiRequest("/api/me");
+      try {
+        const res = await apiRequest("/api/me");
 
-      if (!alive) return;
+        if (!alive) return;
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          clearAccessToken();
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            clearAccessToken();
+            setStatus("unauthenticated");
+            return;
+          }
+
           setStatus("unauthenticated");
           return;
         }
 
+        if (res.body?.role === "ADMIN") {
+          setStatus("allowed");
+          return;
+        }
+
         setStatus("forbidden");
-        return;
+      } catch {
+        if (alive) {
+          clearAccessToken();
+          setStatus("unauthenticated");
+        }
       }
-
-      if (res.body?.role === "ADMIN") {
-        setStatus("allowed");
-        return;
-      }
-
-      setStatus("forbidden");
     }
 
     checkAdmin();
@@ -44,7 +51,7 @@ export default function RequireAdmin({ children }) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [location.pathname]);
 
   if (status === "checking") {
     return null;

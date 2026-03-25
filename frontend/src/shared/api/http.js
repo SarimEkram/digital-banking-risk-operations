@@ -1,5 +1,9 @@
 import { clearAccessToken, getAccessToken } from "../auth/token";
 
+function isMeEndpoint(path) {
+  return path === "/api/me";
+}
+
 export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
 
@@ -14,7 +18,7 @@ export async function apiRequest(path, options = {}) {
 
   const res = await fetch(path, { ...options, headers });
 
-  if (res.status === 401) {
+  if (res.status === 401 || (res.status === 403 && isMeEndpoint(path))) {
     clearAccessToken();
   }
 
