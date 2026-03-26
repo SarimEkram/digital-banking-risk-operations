@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { apiRequest } from "../api/http";
-import { clearAccessToken, hasAccessToken } from "../auth/token";
+import { hasAccessToken } from "../auth/token";
 
 export default function RequireUser({ children }) {
   const location = useLocation();
@@ -22,12 +22,6 @@ export default function RequireUser({ children }) {
         if (!alive) return;
 
         if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
-            clearAccessToken();
-            setStatus("unauthenticated");
-            return;
-          }
-
           setStatus("unauthenticated");
           return;
         }
@@ -40,12 +34,12 @@ export default function RequireUser({ children }) {
         setStatus("allowed");
       } catch {
         if (alive) {
-          clearAccessToken();
           setStatus("unauthenticated");
         }
       }
     }
 
+    setStatus("checking");
     checkUserAccess();
 
     return () => {

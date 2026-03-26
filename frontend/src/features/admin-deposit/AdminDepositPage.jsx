@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
 import { apiRequest } from "../../shared/api/http";
-import { clearAccessToken } from "../../shared/auth/token";
+
 import { createAdminDeposit, lookupAdminDepositAccount } from "./api";
 import styles from "../../styles/AdminDepositPage.module.css";
 
@@ -78,7 +78,6 @@ export default function AdminDepositPage() {
 
       if (!res.ok) {
         if (res.status === 401) {
-          clearAccessToken();
           navigate("/login", { replace: true });
           return;
         }
@@ -130,7 +129,6 @@ export default function AdminDepositPage() {
       setSuccess(`Resolved ${result.email} to account ${result.accountId}.`);
     } catch (err) {
       if (err?.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }
@@ -185,7 +183,6 @@ export default function AdminDepositPage() {
       setAmount("");
     } catch (err) {
       if (err?.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }

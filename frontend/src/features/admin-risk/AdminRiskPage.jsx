@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
-import { clearAccessToken } from "../../shared/auth/token";
+
 import {
   listHeldTransfers,
   approveHeldTransfer,
@@ -86,7 +86,6 @@ export default function AdminRiskPage() {
       setItems(data);
     } catch (e) {
       if (e?.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }
@@ -124,7 +123,6 @@ export default function AdminRiskPage() {
       await loadQueue({ silent: true });
     } catch (e) {
       if (e?.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }
@@ -150,7 +148,6 @@ export default function AdminRiskPage() {
       await loadQueue({ silent: true });
     } catch (e) {
       if (e?.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }

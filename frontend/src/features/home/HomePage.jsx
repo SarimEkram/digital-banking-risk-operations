@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
-import { clearAccessToken } from "../../shared/auth/token";
+
 import { getMe, getAccounts } from "./api";
 import styles from "../../styles/HomePage.module.css";
 
@@ -52,7 +52,6 @@ export default function HomePage() {
         (!accRes.ok && (accRes.status === 401 || accRes.status === 403));
 
       if (authFailed) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }
@@ -72,9 +71,9 @@ export default function HomePage() {
       setAccounts(Array.isArray(accRes.body) ? accRes.body : []);
       setLoading(false);
     } catch {
-      clearAccessToken();
-      navigate("/login", { replace: true });
-    }
+        setError("Failed to load your dashboard. Please try again.");
+        setLoading(false);
+      }
   }
 
   useEffect(() => {

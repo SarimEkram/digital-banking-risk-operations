@@ -26,8 +26,7 @@ export default function AuthedLayout() {
           return;
         }
 
-        if (res.status === 401) {
-          clearAccessToken();
+        if (res.status === 401 || res.status === 403) {
           navigate("/login", { replace: true });
           return;
         }

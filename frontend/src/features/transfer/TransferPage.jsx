@@ -5,7 +5,6 @@ import Card from "../../shared/ui/Card";
 import Button from "../../shared/ui/Button";
 import TextField from "../../shared/ui/TextField";
 
-import { clearAccessToken } from "../../shared/auth/token";
 import { getAccounts } from "../home/api";
 import { listPayees } from "../payees/api";
 import { createTransfer } from "./api";
@@ -91,7 +90,6 @@ export default function TransferPage() {
 
     for (const res of [acctRes, payeeRes]) {
       if (!res.ok && res.status === 401) {
-        clearAccessToken();
         navigate("/login", { replace: true });
         return;
       }
@@ -175,7 +173,6 @@ export default function TransferPage() {
     );
 
     if (!res.ok && res.status === 401) {
-      clearAccessToken();
       navigate("/login", { replace: true });
       return;
     }
