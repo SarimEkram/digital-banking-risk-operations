@@ -4,6 +4,7 @@ import LoginPage from "../features/auth/LoginPage.jsx";
 import HomePage from "../features/home/HomePage.jsx";
 import RequireAuth from "../shared/routing/RequireAuth.jsx";
 import RequireAdmin from "../shared/routing/RequireAdmin.jsx";
+import RequireUser from "../shared/routing/RequireUser.jsx";
 import { hasAccessToken } from "../shared/auth/token";
 
 import AuthedLayout from "../shared/layout/AuthedLayout.jsx";
@@ -32,8 +33,25 @@ export default function App() {
         }
       >
         <Route path="home" element={<HomePage />} />
-        <Route path="transfer" element={<TransferPage />} />
-        <Route path="payees" element={<PayeesPage />} />
+
+        <Route
+          path="transfer"
+          element={
+            <RequireUser>
+              <TransferPage />
+            </RequireUser>
+          }
+        />
+
+        <Route
+          path="payees"
+          element={
+            <RequireUser>
+              <PayeesPage />
+            </RequireUser>
+          }
+        />
+
         <Route path="activity" element={<ActivityPage />} />
 
         <Route

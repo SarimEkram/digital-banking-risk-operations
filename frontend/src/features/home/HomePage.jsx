@@ -184,18 +184,22 @@ export default function HomePage() {
                   <div>
                     <h3 className={styles.ctaTitle}>Quick actions</h3>
                     <p className={styles.sub}>
-                      Manage payees, send transfers, and track activity from the main navigation.
+                      {me?.role === "ADMIN"
+                        ? "Review held transfers and manage admin operations from the main navigation."
+                        : "Manage payees, send transfers, and track activity from the main navigation."}
                     </p>
                   </div>
 
                   <div className={styles.ctaActions}>
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      onClick={() => navigate("/transfer")}
-                    >
-                      Transfer money
-                    </button>
+                    {me?.role !== "ADMIN" && (
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        onClick={() => navigate("/transfer")}
+                      >
+                        Transfer money
+                      </button>
+                    )}
 
                     {me?.role === "ADMIN" && (
                       <button
