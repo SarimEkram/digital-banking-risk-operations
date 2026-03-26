@@ -52,7 +52,14 @@ export default function App() {
           }
         />
 
-        <Route path="activity" element={<ActivityPage />} />
+        <Route
+          path="activity"
+          element={
+            <RequireUser>
+              <ActivityPage />
+            </RequireUser>
+          }
+        />
 
         <Route
           path="admin/deposit"
