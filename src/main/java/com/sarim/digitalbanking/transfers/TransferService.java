@@ -9,9 +9,6 @@ import com.sarim.digitalbanking.audit.AuditLogEntity;
 import com.sarim.digitalbanking.audit.AuditLogRepository;
 import com.sarim.digitalbanking.auth.UserEntity;
 import com.sarim.digitalbanking.auth.UserRepository;
-import com.sarim.digitalbanking.ledger.LedgerDirection;
-import com.sarim.digitalbanking.ledger.LedgerEntryEntity;
-import com.sarim.digitalbanking.ledger.LedgerEntryRepository;
 import com.sarim.digitalbanking.payees.PayeeEntity;
 import com.sarim.digitalbanking.payees.PayeeRepository;
 import com.sarim.digitalbanking.transfers.api.CreateTransferRequest;
@@ -43,34 +40,34 @@ public class TransferService {
 
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
-    private final LedgerEntryRepository ledgerEntryRepository;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final PayeeRepository payeeRepository;
     private final EntityManager entityManager;
     private final TransferVelocityRiskService transferVelocityRiskService;
     private final TransferResponseMapper transferResponseMapper;
+    private final TransferSettlementService transferSettlementService;
 
     public TransferService(
             AccountRepository accountRepository,
             TransferRepository transferRepository,
-            LedgerEntryRepository ledgerEntryRepository,
             AuditLogRepository auditLogRepository,
             UserRepository userRepository,
             PayeeRepository payeeRepository,
             EntityManager entityManager,
             TransferVelocityRiskService transferVelocityRiskService,
-            TransferResponseMapper transferResponseMapper
+            TransferResponseMapper transferResponseMapper,
+            TransferSettlementService transferSettlementService
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
-        this.ledgerEntryRepository = ledgerEntryRepository;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.payeeRepository = payeeRepository;
         this.entityManager = entityManager;
         this.transferVelocityRiskService = transferVelocityRiskService;
         this.transferResponseMapper = transferResponseMapper;
+        this.transferSettlementService = transferSettlementService;
     }
 
     @Transactional
@@ -191,7 +188,7 @@ public class TransferService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (holdForReview) {
-            applyHeldTransferReserve(t, from, amount, currency);
+            transferSettlementService.applyHeldTransferReserve(t, from, amount, currency);
 
             AuditLogEntity log = new AuditLogEntity();
             log.setActorUser(actor);
@@ -213,7 +210,7 @@ public class TransferService {
             return transferResponseMapper.toUserResponse(t, actorUserId);
         }
 
-        applyLedgerAndBalances(t, from, to, amount, currency);
+        transferSettlementService.applyLedgerAndBalances(t, from, to, amount, currency);
 
         AuditLogEntity log = new AuditLogEntity();
         log.setActorUser(actor);
@@ -328,7 +325,7 @@ public class TransferService {
             return transferResponseMapper.toUserResponse(t, systemUser.getId());
         }
 
-        applyLedgerAndBalances(t, from, to, amount, CAD);
+        transferSettlementService.applyLedgerAndBalances(t, from, to, amount, CAD);
 
         AuditLogEntity log = new AuditLogEntity();
         log.setActorUser(adminActor);
@@ -406,7 +403,7 @@ public class TransferService {
             throw new IllegalArgumentException("To account is not active");
         }
 
-        applyHeldTransferApprovalCredit(t, to, t.getAmountCents(), t.getCurrency());
+        transferSettlementService.applyHeldTransferApprovalCredit(t, to, t.getAmountCents(), t.getCurrency());
 
         t.setStatus(TransferStatus.COMPLETED);
         t.setRiskDecision("APPROVE");
@@ -442,7 +439,7 @@ public class TransferService {
 
         AccountEntity from = locked.get(0).getId().equals(t.getFromAccount().getId()) ? locked.get(0) : locked.get(1);
 
-        applyHeldTransferRefund(t, from, t.getAmountCents(), t.getCurrency());
+        transferSettlementService.applyHeldTransferRefund(t, from, t.getAmountCents(), t.getCurrency());
 
         String finalReason = (reason == null || reason.isBlank())
                 ? "rejected during manual review"
@@ -611,91 +608,6 @@ public class TransferService {
         t.setStatus(TransferStatus.COMPLETED);
         t.setIdempotencyKey(idempotencyKey);
         return t;
-    }
-
-    private void applyHeldTransferReserve(
-            TransferEntity transfer,
-            AccountEntity from,
-            long amountCents,
-            String currency
-    ) {
-        LedgerEntryEntity debit = new LedgerEntryEntity();
-        debit.setTransfer(transfer);
-        debit.setAccount(from);
-        debit.setDirection(LedgerDirection.DEBIT);
-        debit.setAmountCents(amountCents);
-        debit.setCurrency(currency);
-
-        ledgerEntryRepository.save(debit);
-
-        from.setBalanceCents(from.getBalanceCents() - amountCents);
-        accountRepository.save(from);
-    }
-
-    private void applyHeldTransferApprovalCredit(
-            TransferEntity transfer,
-            AccountEntity to,
-            long amountCents,
-            String currency
-    ) {
-        LedgerEntryEntity credit = new LedgerEntryEntity();
-        credit.setTransfer(transfer);
-        credit.setAccount(to);
-        credit.setDirection(LedgerDirection.CREDIT);
-        credit.setAmountCents(amountCents);
-        credit.setCurrency(currency);
-
-        ledgerEntryRepository.save(credit);
-
-        to.setBalanceCents(to.getBalanceCents() + amountCents);
-        accountRepository.save(to);
-    }
-
-    private void applyHeldTransferRefund(
-            TransferEntity transfer,
-            AccountEntity from,
-            long amountCents,
-            String currency
-    ) {
-        LedgerEntryEntity refund = new LedgerEntryEntity();
-        refund.setTransfer(transfer);
-        refund.setAccount(from);
-        refund.setDirection(LedgerDirection.CREDIT);
-        refund.setAmountCents(amountCents);
-        refund.setCurrency(currency);
-
-        ledgerEntryRepository.save(refund);
-
-        from.setBalanceCents(from.getBalanceCents() + amountCents);
-        accountRepository.save(from);
-    }
-
-    private void applyLedgerAndBalances(
-            TransferEntity transfer,
-            AccountEntity from,
-            AccountEntity to,
-            long amountCents,
-            String currency
-    ) {
-        LedgerEntryEntity debit = new LedgerEntryEntity();
-        debit.setTransfer(transfer);
-        debit.setAccount(from);
-        debit.setDirection(LedgerDirection.DEBIT);
-        debit.setAmountCents(amountCents);
-        debit.setCurrency(currency);
-
-        LedgerEntryEntity credit = new LedgerEntryEntity();
-        credit.setTransfer(transfer);
-        credit.setAccount(to);
-        credit.setDirection(LedgerDirection.CREDIT);
-        credit.setAmountCents(amountCents);
-        credit.setCurrency(currency);
-
-        ledgerEntryRepository.saveAll(List.of(debit, credit));
-
-        from.setBalanceCents(from.getBalanceCents() - amountCents);
-        to.setBalanceCents(to.getBalanceCents() + amountCents);
-        accountRepository.saveAll(List.of(from, to));
     }
 
     private boolean sameTransferRequest(
