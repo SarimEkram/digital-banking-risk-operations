@@ -49,6 +49,7 @@ public class TransferService {
     private final PayeeRepository payeeRepository;
     private final EntityManager entityManager;
     private final TransferVelocityRiskService transferVelocityRiskService;
+    private final TransferResponseMapper transferResponseMapper;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -58,7 +59,8 @@ public class TransferService {
             UserRepository userRepository,
             PayeeRepository payeeRepository,
             EntityManager entityManager,
-            TransferVelocityRiskService transferVelocityRiskService
+            TransferVelocityRiskService transferVelocityRiskService,
+            TransferResponseMapper transferResponseMapper
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -68,6 +70,7 @@ public class TransferService {
         this.payeeRepository = payeeRepository;
         this.entityManager = entityManager;
         this.transferVelocityRiskService = transferVelocityRiskService;
+        this.transferResponseMapper = transferResponseMapper;
     }
 
     @Transactional
@@ -118,7 +121,7 @@ public class TransferService {
                 );
             }
 
-            return toResponse(t, actorUserId);
+            return transferResponseMapper.toUserResponse(t, actorUserId);
         }
 
         if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
@@ -181,7 +184,7 @@ public class TransferService {
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
-            return toResponse(t, actorUserId);
+            return transferResponseMapper.toUserResponse(t, actorUserId);
         }
 
         UserEntity actor = userRepository.findById(actorUserId)
@@ -207,7 +210,7 @@ public class TransferService {
 
             transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
-            return toResponse(t, actorUserId);
+            return transferResponseMapper.toUserResponse(t, actorUserId);
         }
 
         applyLedgerAndBalances(t, from, to, amount, currency);
@@ -227,7 +230,7 @@ public class TransferService {
 
         transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
-        return toResponse(t, actorUserId);
+        return transferResponseMapper.toUserResponse(t, actorUserId);
     }
 
     @Transactional
@@ -269,7 +272,7 @@ public class TransferService {
                 );
             }
 
-            return toResponse(t, systemUser.getId());
+            return transferResponseMapper.toUserResponse(t, systemUser.getId());
         }
 
         List<Long> ids = List.of(treasuryAccountId, req.toAccountId()).stream()
@@ -322,7 +325,7 @@ public class TransferService {
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
-            return toResponse(t, systemUser.getId());
+            return transferResponseMapper.toUserResponse(t, systemUser.getId());
         }
 
         applyLedgerAndBalances(t, from, to, amount, CAD);
@@ -338,7 +341,7 @@ public class TransferService {
                 + ", currency=" + CAD);
         auditLogRepository.save(log);
 
-        return toResponse(t, systemUser.getId());
+        return transferResponseMapper.toUserResponse(t, systemUser.getId());
     }
 
     @Transactional(readOnly = true)
@@ -364,7 +367,7 @@ public class TransferService {
             page = page.subList(0, safeLimit);
         }
 
-        var items = page.stream().map(t -> toResponse(t, actorUserId)).toList();
+        var items = page.stream().map(t -> transferResponseMapper.toUserResponse(t, actorUserId)).toList();
         return new TransferPageResponse(items, nextCursor);
     }
 
@@ -374,7 +377,7 @@ public class TransferService {
 
         return transferRepository.findByStatusOrderByCreatedAtAsc(TransferStatus.PENDING_REVIEW)
                 .stream()
-                .map(this::toAdminHeldResponse)
+                .map(transferResponseMapper::toAdminHeldResponse)
                 .toList();
     }
 
@@ -420,7 +423,7 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        return toAdminHeldResponse(t);
+        return transferResponseMapper.toAdminHeldResponse(t);
     }
 
     @Transactional
@@ -462,7 +465,7 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        return toAdminHeldResponse(t);
+        return transferResponseMapper.toAdminHeldResponse(t);
     }
 
     private String encodeCursor(Instant createdAt, Long id) {
@@ -747,59 +750,4 @@ public class TransferService {
 
     private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
 
-    private AdminHeldTransferResponse toAdminHeldResponse(TransferEntity t) {
-        String fromEmail = t.getFromAccount().getUser().getEmail();
-        String toEmail = t.getToAccount().getUser().getEmail();
-
-        return new AdminHeldTransferResponse(
-                t.getId(),
-                t.getFromAccount().getId(),
-                t.getToAccount().getId(),
-                t.getAmountCents(),
-                t.getCurrency(),
-                t.getStatus().name(),
-                t.getRiskDecision(),
-                t.getRiskScore(),
-                t.getRiskReasons(),
-                t.getCreatedAt(),
-                fromEmail,
-                toEmail
-        );
-    }
-
-    private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
-        Long fromUid = t.getFromAccount().getUser().getId();
-        Long toUid   = t.getToAccount().getUser().getId();
-
-        String fromEmail = t.getFromAccount().getUser().getEmail();
-        String toEmail   = t.getToAccount().getUser().getEmail();
-
-        String direction = "UNKNOWN";
-        String counterpartyEmail = null;
-
-        if (actorUserId != null && actorUserId.equals(fromUid)) {
-            direction = "SENT";
-            counterpartyEmail = toEmail;
-        } else if (actorUserId != null && actorUserId.equals(toUid)) {
-            direction = "RECEIVED";
-            counterpartyEmail = fromEmail;
-        }
-
-        return new TransferResponse(
-                t.getId(),
-                t.getFromAccount().getId(),
-                t.getToAccount().getId(),
-                t.getAmountCents(),
-                t.getCurrency(),
-                t.getStatus().name(),
-                t.getRiskDecision(),
-                t.getRiskScore(),
-                t.getRiskReasons(),
-                t.getCreatedAt(),
-                fromEmail,
-                toEmail,
-                direction,
-                counterpartyEmail
-        );
-    }
 }
