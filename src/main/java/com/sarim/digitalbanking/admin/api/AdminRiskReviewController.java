@@ -1,7 +1,6 @@
 package com.sarim.digitalbanking.admin.api;
 
 import com.sarim.digitalbanking.transfers.TransferService;
-import com.sarim.digitalbanking.transfers.api.TransferResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +19,13 @@ public class AdminRiskReviewController {
     }
 
     @GetMapping("/held")
-    public List<TransferResponse> listHeld(HttpServletRequest request) {
+    public List<AdminHeldTransferResponse> listHeld(HttpServletRequest request) {
         Long adminUserId = requireUid(request);
         return transferService.listHeldTransfers(adminUserId);
     }
 
     @PostMapping("/{transferId}/approve")
-    public TransferResponse approve(
+    public AdminHeldTransferResponse approve(
             @PathVariable Long transferId,
             HttpServletRequest request
     ) {
@@ -35,7 +34,7 @@ public class AdminRiskReviewController {
     }
 
     @PostMapping("/{transferId}/reject")
-    public TransferResponse reject(
+    public AdminHeldTransferResponse reject(
             @PathVariable Long transferId,
             @RequestBody(required = false) RejectHeldTransferRequest body,
             HttpServletRequest request

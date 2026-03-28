@@ -3,6 +3,7 @@ package com.sarim.digitalbanking.transfers;
 import com.sarim.digitalbanking.accounts.AccountEntity;
 import com.sarim.digitalbanking.accounts.AccountRepository;
 import com.sarim.digitalbanking.accounts.AccountType;
+import com.sarim.digitalbanking.admin.api.AdminHeldTransferResponse;
 import com.sarim.digitalbanking.admin.api.CreateAdminDepositRequest;
 import com.sarim.digitalbanking.audit.AuditLogEntity;
 import com.sarim.digitalbanking.audit.AuditLogRepository;
@@ -368,22 +369,17 @@ public class TransferService {
     }
 
     @Transactional(readOnly = true)
-    public List<TransferResponse> listHeldTransfers(Long adminUserId) {
+    public List<AdminHeldTransferResponse> listHeldTransfers(Long adminUserId) {
         requireAdminActor(adminUserId);
 
         return transferRepository.findByStatusOrderByCreatedAtAsc(TransferStatus.PENDING_REVIEW)
                 .stream()
-                .map(t -> toResponse(t, null))
+                .map(this::toAdminHeldResponse)
                 .toList();
     }
 
-    // TODO: Replace user-facing TransferResponse for admin review endpoints with a dedicated admin DTO.
-    // Admin actions currently return toResponse(t, null), which makes direction = "UNKNOWN"
-    // and counterpartyEmail = null because there is no sender/recipient actor perspective.
-    // Later, create an admin-specific response shape with fields like fromEmail, toEmail,
-    // status, riskDecision, riskReasons, reviewedBy, and review outcome details.
     @Transactional
-    public TransferResponse approveHeldTransfer(Long adminUserId, Long transferId) {
+    public AdminHeldTransferResponse approveHeldTransfer(Long adminUserId, Long transferId) {
         UserEntity adminActor = requireAdminActor(adminUserId);
         TransferEntity t = requirePendingTransferForUpdate(transferId);
 
@@ -424,17 +420,11 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        return toResponse(t, null);
+        return toAdminHeldResponse(t);
     }
 
-    // TODO: Replace user-facing TransferResponse for admin review endpoints with a dedicated admin DTO.
-    // Admin actions currently return toResponse(t, null), which makes direction = "UNKNOWN"
-    // and counterpartyEmail = null because there is no sender/recipient actor perspective.
-    // Later, create an admin-specific response shape with fields like fromEmail, toEmail,
-    // status, riskDecision, riskReasons, reviewedBy, and review outcome details.
-
     @Transactional
-    public TransferResponse rejectHeldTransfer(Long adminUserId, Long transferId, String reason) {
+    public AdminHeldTransferResponse rejectHeldTransfer(Long adminUserId, Long transferId, String reason) {
         UserEntity adminActor = requireAdminActor(adminUserId);
         TransferEntity t = requirePendingTransferForUpdate(transferId);
 
@@ -472,7 +462,7 @@ public class TransferService {
 
         auditLogRepository.save(log);
 
-        return toResponse(t, null);
+        return toAdminHeldResponse(t);
     }
 
     private String encodeCursor(Instant createdAt, Long id) {
@@ -756,6 +746,26 @@ public class TransferService {
     private record RiskHoldDecision(boolean hold, String reason, Integer score) {}
 
     private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
+
+    private AdminHeldTransferResponse toAdminHeldResponse(TransferEntity t) {
+        String fromEmail = t.getFromAccount().getUser().getEmail();
+        String toEmail = t.getToAccount().getUser().getEmail();
+
+        return new AdminHeldTransferResponse(
+                t.getId(),
+                t.getFromAccount().getId(),
+                t.getToAccount().getId(),
+                t.getAmountCents(),
+                t.getCurrency(),
+                t.getStatus().name(),
+                t.getRiskDecision(),
+                t.getRiskScore(),
+                t.getRiskReasons(),
+                t.getCreatedAt(),
+                fromEmail,
+                toEmail
+        );
+    }
 
     private TransferResponse toResponse(TransferEntity t, Long actorUserId) {
         Long fromUid = t.getFromAccount().getUser().getId();
