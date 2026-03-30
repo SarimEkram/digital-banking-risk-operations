@@ -5,8 +5,6 @@ import com.sarim.digitalbanking.accounts.AccountRepository;
 import com.sarim.digitalbanking.accounts.AccountType;
 import com.sarim.digitalbanking.admin.api.AdminHeldTransferResponse;
 import com.sarim.digitalbanking.admin.api.CreateAdminDepositRequest;
-import com.sarim.digitalbanking.audit.AuditLogEntity;
-import com.sarim.digitalbanking.audit.AuditLogRepository;
 import com.sarim.digitalbanking.auth.UserEntity;
 import com.sarim.digitalbanking.auth.UserRepository;
 import com.sarim.digitalbanking.payees.PayeeEntity;
@@ -40,34 +38,34 @@ public class TransferService {
 
     private final AccountRepository accountRepository;
     private final TransferRepository transferRepository;
-    private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final PayeeRepository payeeRepository;
     private final EntityManager entityManager;
     private final TransferVelocityRiskService transferVelocityRiskService;
     private final TransferResponseMapper transferResponseMapper;
     private final TransferSettlementService transferSettlementService;
+    private final TransferAuditService transferAuditService;
 
     public TransferService(
             AccountRepository accountRepository,
             TransferRepository transferRepository,
-            AuditLogRepository auditLogRepository,
             UserRepository userRepository,
             PayeeRepository payeeRepository,
             EntityManager entityManager,
             TransferVelocityRiskService transferVelocityRiskService,
             TransferResponseMapper transferResponseMapper,
-            TransferSettlementService transferSettlementService
+            TransferSettlementService transferSettlementService,
+            TransferAuditService transferAuditService
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
-        this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.payeeRepository = payeeRepository;
         this.entityManager = entityManager;
         this.transferVelocityRiskService = transferVelocityRiskService;
         this.transferResponseMapper = transferResponseMapper;
         this.transferSettlementService = transferSettlementService;
+        this.transferAuditService = transferAuditService;
     }
 
     @Transactional
@@ -190,20 +188,16 @@ public class TransferService {
         if (holdForReview) {
             transferSettlementService.applyHeldTransferReserve(t, from, amount, currency);
 
-            AuditLogEntity log = new AuditLogEntity();
-            log.setActorUser(actor);
-            log.setAction("TRANSFER_HELD");
-            log.setEntityType("transfer");
-            log.setEntityId(String.valueOf(t.getId()));
-            log.setDetails("from=" + from.getId()
-                    + ", payee_id=" + payee.getId()
-                    + ", to=" + to.getId()
-                    + ", amount_cents=" + amount
-                    + ", currency=" + currency
-                    + ", reason=" + riskHoldDecision.reason()
-                    + ", funds_reserved=true");
-
-            auditLogRepository.save(log);
+            transferAuditService.logTransferHeld(
+                    actor,
+                    t.getId(),
+                    from.getId(),
+                    payee.getId(),
+                    to.getId(),
+                    amount,
+                    currency,
+                    riskHoldDecision.reason()
+            );
 
             transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
@@ -212,18 +206,15 @@ public class TransferService {
 
         transferSettlementService.applyLedgerAndBalances(t, from, to, amount, currency);
 
-        AuditLogEntity log = new AuditLogEntity();
-        log.setActorUser(actor);
-        log.setAction("TRANSFER_CREATE");
-        log.setEntityType("transfer");
-        log.setEntityId(String.valueOf(t.getId()));
-        log.setDetails("from=" + from.getId()
-                + ", payee_id=" + payee.getId()
-                + ", to=" + to.getId()
-                + ", amount_cents=" + amount
-                + ", currency=" + currency);
-
-        auditLogRepository.save(log);
+        transferAuditService.logTransferCreate(
+                actor,
+                t.getId(),
+                from.getId(),
+                payee.getId(),
+                to.getId(),
+                amount,
+                currency
+        );
 
         transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
@@ -327,16 +318,14 @@ public class TransferService {
 
         transferSettlementService.applyLedgerAndBalances(t, from, to, amount, CAD);
 
-        AuditLogEntity log = new AuditLogEntity();
-        log.setActorUser(adminActor);
-        log.setAction("ADMIN_DEPOSIT");
-        log.setEntityType("transfer");
-        log.setEntityId(String.valueOf(t.getId()));
-        log.setDetails("from_treasury=" + from.getId()
-                + ", to=" + to.getId()
-                + ", amount_cents=" + amount
-                + ", currency=" + CAD);
-        auditLogRepository.save(log);
+        transferAuditService.logAdminDeposit(
+                adminActor,
+                t.getId(),
+                from.getId(),
+                to.getId(),
+                amount,
+                CAD
+        );
 
         return transferResponseMapper.toUserResponse(t, systemUser.getId());
     }
@@ -409,16 +398,13 @@ public class TransferService {
         t.setRiskDecision("APPROVE");
         transferRepository.save(t);
 
-        AuditLogEntity log = new AuditLogEntity();
-        log.setActorUser(adminActor);
-        log.setAction("TRANSFER_APPROVE");
-        log.setEntityType("transfer");
-        log.setEntityId(String.valueOf(t.getId()));
-        log.setDetails("to=" + to.getId()
-                + ", amount_cents=" + t.getAmountCents()
-                + ", currency=" + t.getCurrency());
-
-        auditLogRepository.save(log);
+        transferAuditService.logTransferApprove(
+                adminActor,
+                t.getId(),
+                to.getId(),
+                t.getAmountCents(),
+                t.getCurrency()
+        );
 
         return transferResponseMapper.toAdminHeldResponse(t);
     }
@@ -450,17 +436,14 @@ public class TransferService {
         t.setRiskReasons(finalReason);
         transferRepository.save(t);
 
-        AuditLogEntity log = new AuditLogEntity();
-        log.setActorUser(adminActor);
-        log.setAction("TRANSFER_REJECT");
-        log.setEntityType("transfer");
-        log.setEntityId(String.valueOf(t.getId()));
-        log.setDetails("from=" + from.getId()
-                + ", amount_cents=" + t.getAmountCents()
-                + ", currency=" + t.getCurrency()
-                + ", reason=" + finalReason);
-
-        auditLogRepository.save(log);
+        transferAuditService.logTransferReject(
+                adminActor,
+                t.getId(),
+                from.getId(),
+                t.getAmountCents(),
+                t.getCurrency(),
+                finalReason
+        );
 
         return transferResponseMapper.toAdminHeldResponse(t);
     }
