@@ -40,35 +40,35 @@ public class TransferService {
     private final TransferRepository transferRepository;
     private final UserRepository userRepository;
     private final PayeeRepository payeeRepository;
-    private final EntityManager entityManager;
     private final TransferVelocityRiskService transferVelocityRiskService;
     private final TransferResponseMapper transferResponseMapper;
     private final TransferSettlementService transferSettlementService;
     private final TransferAuditService transferAuditService;
     private final TransferRiskDecisionService transferRiskDecisionService;
+    private final TransferPersistenceService transferPersistenceService;
 
     public TransferService(
             AccountRepository accountRepository,
             TransferRepository transferRepository,
             UserRepository userRepository,
             PayeeRepository payeeRepository,
-            EntityManager entityManager,
             TransferVelocityRiskService transferVelocityRiskService,
             TransferResponseMapper transferResponseMapper,
             TransferSettlementService transferSettlementService,
             TransferAuditService transferAuditService,
-            TransferRiskDecisionService transferRiskDecisionService
+            TransferRiskDecisionService transferRiskDecisionService,
+            TransferPersistenceService transferPersistenceService
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
         this.userRepository = userRepository;
         this.payeeRepository = payeeRepository;
-        this.entityManager = entityManager;
         this.transferVelocityRiskService = transferVelocityRiskService;
         this.transferResponseMapper = transferResponseMapper;
         this.transferSettlementService = transferSettlementService;
         this.transferAuditService = transferAuditService;
         this.transferRiskDecisionService = transferRiskDecisionService;
+        this.transferPersistenceService = transferPersistenceService;
     }
 
     @Transactional
@@ -173,13 +173,14 @@ public class TransferService {
                 ? newHeldTransfer(from, to, amount, currency, idempotencyKey, riskHoldDecision)
                 : newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
-        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
-                t,
-                idempotencyKey,
-                () -> transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId),
-                winner -> sameTransferRequest(winner, req.fromAccountId(), toAccountId, amount, currency),
-                true
-        );
+        TransferPersistenceService.SaveTransferOutcome saveOutcome =
+                transferPersistenceService.saveTransferWithIdempotentReplay(
+                        t,
+                        idempotencyKey,
+                        () -> transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId),
+                        winner -> sameTransferRequest(winner, req.fromAccountId(), toAccountId, amount, currency),
+                        true
+                );
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
@@ -307,13 +308,14 @@ public class TransferService {
 
         TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
-        SaveTransferOutcome saveOutcome = saveTransferWithIdempotentReplay(
-                t,
-                idempotencyKey,
-                () -> transferRepository.findByIdempotencyKey(idempotencyKey),
-                winner -> sameTransferRequest(winner, treasuryAccountId, req.toAccountId(), amount, CAD),
-                false
-        );
+        TransferPersistenceService.SaveTransferOutcome saveOutcome =
+                transferPersistenceService.saveTransferWithIdempotentReplay(
+                        t,
+                        idempotencyKey,
+                        () -> transferRepository.findByIdempotencyKey(idempotencyKey),
+                        winner -> sameTransferRequest(winner, treasuryAccountId, req.toAccountId(), amount, CAD),
+                        false
+                );
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
@@ -546,42 +548,5 @@ public class TransferService {
                 && t.getAmountCents() == expectedAmountCents
                 && t.getCurrency().equalsIgnoreCase(expectedCurrency);
     }
-
-    private SaveTransferOutcome saveTransferWithIdempotentReplay(
-            TransferEntity candidate,
-            String idempotencyKey,
-            Supplier<Optional<TransferEntity>> replayLookup,
-            Predicate<TransferEntity> sameRequest,
-            boolean rethrowUnknownDuplicate
-    ) {
-        try {
-            TransferEntity saved = transferRepository.saveAndFlush(candidate);
-            entityManager.refresh(saved);
-            return new SaveTransferOutcome(saved, false);
-        } catch (DataIntegrityViolationException dup) {
-            Optional<TransferEntity> winnerOpt = replayLookup.get();
-
-            if (winnerOpt.isPresent()) {
-                TransferEntity winner = winnerOpt.get();
-
-                if (sameRequest.test(winner)) {
-                    return new SaveTransferOutcome(winner, true);
-                }
-
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Idempotency-Key was already used with a different request"
-                );
-            }
-
-            if (!rethrowUnknownDuplicate || transferRepository.existsByIdempotencyKey(idempotencyKey)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was already used");
-            }
-
-            throw dup;
-        }
-    }
-
-    private record SaveTransferOutcome(TransferEntity transfer, boolean replayed) {}
 
 }
