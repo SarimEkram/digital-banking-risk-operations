@@ -12,8 +12,6 @@ import com.sarim.digitalbanking.payees.PayeeRepository;
 import com.sarim.digitalbanking.transfers.api.CreateTransferRequest;
 import com.sarim.digitalbanking.transfers.api.TransferPageResponse;
 import com.sarim.digitalbanking.transfers.api.TransferResponse;
-import jakarta.persistence.EntityManager;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,9 +23,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 @Service
 public class TransferService {
@@ -46,6 +41,7 @@ public class TransferService {
     private final TransferAuditService transferAuditService;
     private final TransferRiskDecisionService transferRiskDecisionService;
     private final TransferPersistenceService transferPersistenceService;
+    private final TransferFactory transferFactory;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -57,7 +53,8 @@ public class TransferService {
             TransferSettlementService transferSettlementService,
             TransferAuditService transferAuditService,
             TransferRiskDecisionService transferRiskDecisionService,
-            TransferPersistenceService transferPersistenceService
+            TransferPersistenceService transferPersistenceService,
+            TransferFactory transferFactory
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -69,6 +66,7 @@ public class TransferService {
         this.transferAuditService = transferAuditService;
         this.transferRiskDecisionService = transferRiskDecisionService;
         this.transferPersistenceService = transferPersistenceService;
+        this.transferFactory = transferFactory;
     }
 
     @Transactional
@@ -170,8 +168,8 @@ public class TransferService {
         boolean holdForReview = riskHoldDecision.hold();
 
         TransferEntity t = holdForReview
-                ? newHeldTransfer(from, to, amount, currency, idempotencyKey, riskHoldDecision)
-                : newCompletedTransfer(from, to, amount, currency, idempotencyKey);
+                ? transferFactory.newHeldTransfer(from, to, amount, currency, idempotencyKey, riskHoldDecision)
+                : transferFactory.newCompletedTransfer(from, to, amount, currency, idempotencyKey);
 
         TransferPersistenceService.SaveTransferOutcome saveOutcome =
                 transferPersistenceService.saveTransferWithIdempotentReplay(
@@ -306,7 +304,7 @@ public class TransferService {
             throw new IllegalArgumentException("insufficient treasury funds");
         }
 
-        TransferEntity t = newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
+        TransferEntity t = transferFactory.newCompletedTransfer(from, to, amount, CAD, idempotencyKey);
 
         TransferPersistenceService.SaveTransferOutcome saveOutcome =
                 transferPersistenceService.saveTransferWithIdempotentReplay(
@@ -494,45 +492,6 @@ public class TransferService {
             );
         }
 
-        return t;
-    }
-
-
-    private TransferEntity newHeldTransfer(
-            AccountEntity from,
-            AccountEntity to,
-            long amountCents,
-            String currency,
-            String idempotencyKey,
-            TransferRiskDecisionService.RiskHoldDecision riskHoldDecision
-    ) {
-        TransferEntity t = new TransferEntity();
-        t.setFromAccount(from);
-        t.setToAccount(to);
-        t.setAmountCents(amountCents);
-        t.setCurrency(currency);
-        t.setStatus(TransferStatus.PENDING_REVIEW);
-        t.setRiskDecision("HOLD");
-        t.setRiskScore(riskHoldDecision.score());
-        t.setRiskReasons(riskHoldDecision.reason());
-        t.setIdempotencyKey(idempotencyKey);
-        return t;
-    }
-
-    private TransferEntity newCompletedTransfer(
-            AccountEntity from,
-            AccountEntity to,
-            long amountCents,
-            String currency,
-            String idempotencyKey
-    ) {
-        TransferEntity t = new TransferEntity();
-        t.setFromAccount(from);
-        t.setToAccount(to);
-        t.setAmountCents(amountCents);
-        t.setCurrency(currency);
-        t.setStatus(TransferStatus.COMPLETED);
-        t.setIdempotencyKey(idempotencyKey);
         return t;
     }
 
