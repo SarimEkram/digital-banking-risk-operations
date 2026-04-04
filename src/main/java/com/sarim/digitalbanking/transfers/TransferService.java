@@ -18,9 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 
@@ -42,6 +40,7 @@ public class TransferService {
     private final TransferRiskDecisionService transferRiskDecisionService;
     private final TransferPersistenceService transferPersistenceService;
     private final TransferFactory transferFactory;
+    private final TransferCursorCodec transferCursorCodec;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -54,7 +53,8 @@ public class TransferService {
             TransferAuditService transferAuditService,
             TransferRiskDecisionService transferRiskDecisionService,
             TransferPersistenceService transferPersistenceService,
-            TransferFactory transferFactory
+            TransferFactory transferFactory,
+            TransferCursorCodec transferCursorCodec
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -67,6 +67,7 @@ public class TransferService {
         this.transferRiskDecisionService = transferRiskDecisionService;
         this.transferPersistenceService = transferPersistenceService;
         this.transferFactory = transferFactory;
+        this.transferCursorCodec = transferCursorCodec;
     }
 
     @Transactional
@@ -343,7 +344,7 @@ public class TransferService {
         if (cursor == null || cursor.isBlank()) {
             page = transferRepository.findFirstPageForUser(actorUserId, pageable);
         } else {
-            long[] decoded = decodeCursor(cursor);
+            long[] decoded = transferCursorCodec.decode(cursor);
             Instant beforeCreatedAt = Instant.ofEpochMilli(decoded[0]);
             long beforeId = decoded[1];
 
@@ -353,7 +354,7 @@ public class TransferService {
         String nextCursor = null;
         if (page.size() > safeLimit) {
             var last = page.get(safeLimit - 1);
-            nextCursor = encodeCursor(last.getCreatedAt(), last.getId());
+            nextCursor = transferCursorCodec.encode(last.getCreatedAt(), last.getId());
             page = page.subList(0, safeLimit);
         }
 
@@ -450,24 +451,6 @@ public class TransferService {
         );
 
         return transferResponseMapper.toAdminHeldResponse(t);
-    }
-
-    private String encodeCursor(Instant createdAt, Long id) {
-        String raw = createdAt.toEpochMilli() + ":" + id;
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private long[] decodeCursor(String cursor) {
-        try {
-            String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
-            String[] parts = raw.split(":");
-            if (parts.length != 2) throw new IllegalArgumentException("bad cursor");
-            long createdAtMillis = Long.parseLong(parts[0]);
-            long id = Long.parseLong(parts[1]);
-            return new long[]{createdAtMillis, id};
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid cursor");
-        }
     }
 
     private UserEntity requireAdminActor(Long adminUserId) {
