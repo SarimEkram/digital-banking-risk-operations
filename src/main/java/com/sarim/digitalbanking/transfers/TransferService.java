@@ -41,6 +41,7 @@ public class TransferService {
     private final TransferPersistenceService transferPersistenceService;
     private final TransferFactory transferFactory;
     private final TransferCursorCodec transferCursorCodec;
+    private final TransferAdminReviewGuard transferAdminReviewGuard;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -54,7 +55,8 @@ public class TransferService {
             TransferRiskDecisionService transferRiskDecisionService,
             TransferPersistenceService transferPersistenceService,
             TransferFactory transferFactory,
-            TransferCursorCodec transferCursorCodec
+            TransferCursorCodec transferCursorCodec,
+            TransferAdminReviewGuard transferAdminReviewGuard
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -68,6 +70,7 @@ public class TransferService {
         this.transferPersistenceService = transferPersistenceService;
         this.transferFactory = transferFactory;
         this.transferCursorCodec = transferCursorCodec;
+        this.transferAdminReviewGuard = transferAdminReviewGuard;
     }
 
     @Transactional
@@ -232,7 +235,7 @@ public class TransferService {
             throw new IllegalArgumentException("amountCents must be > 0");
         }
 
-        UserEntity adminActor = requireAdminActor(adminUserId);
+        UserEntity adminActor = transferAdminReviewGuard.requireAdminActor(adminUserId);
 
         UserEntity systemUser = userRepository.findByEmailIgnoreCase(SYSTEM_USER_EMAIL)
                 .orElseThrow(() -> new IllegalArgumentException("system user not found"));
@@ -364,7 +367,7 @@ public class TransferService {
 
     @Transactional(readOnly = true)
     public List<AdminHeldTransferResponse> listHeldTransfers(Long adminUserId) {
-        requireAdminActor(adminUserId);
+        transferAdminReviewGuard.requireAdminActor(adminUserId);
 
         return transferRepository.findByStatusOrderByCreatedAtAsc(TransferStatus.PENDING_REVIEW)
                 .stream()
@@ -374,8 +377,8 @@ public class TransferService {
 
     @Transactional
     public AdminHeldTransferResponse approveHeldTransfer(Long adminUserId, Long transferId) {
-        UserEntity adminActor = requireAdminActor(adminUserId);
-        TransferEntity t = requirePendingTransferForUpdate(transferId);
+        UserEntity adminActor = transferAdminReviewGuard.requireAdminActor(adminUserId);
+        TransferEntity t = transferAdminReviewGuard.requirePendingTransferForUpdate(transferId);
 
         List<Long> ids = List.of(t.getFromAccount().getId(), t.getToAccount().getId()).stream()
                 .sorted(Comparator.naturalOrder())
@@ -416,8 +419,8 @@ public class TransferService {
 
     @Transactional
     public AdminHeldTransferResponse rejectHeldTransfer(Long adminUserId, Long transferId, String reason) {
-        UserEntity adminActor = requireAdminActor(adminUserId);
-        TransferEntity t = requirePendingTransferForUpdate(transferId);
+        UserEntity adminActor = transferAdminReviewGuard.requireAdminActor(adminUserId);
+        TransferEntity t = transferAdminReviewGuard.requirePendingTransferForUpdate(transferId);
 
         List<Long> ids = List.of(t.getFromAccount().getId(), t.getToAccount().getId()).stream()
                 .sorted(Comparator.naturalOrder())
@@ -451,31 +454,6 @@ public class TransferService {
         );
 
         return transferResponseMapper.toAdminHeldResponse(t);
-    }
-
-    private UserEntity requireAdminActor(Long adminUserId) {
-        UserEntity adminActor = userRepository.findById(adminUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        if (adminActor.getRole() == null || !"ADMIN".equalsIgnoreCase(adminActor.getRole().name())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only");
-        }
-
-        return adminActor;
-    }
-
-    private TransferEntity requirePendingTransferForUpdate(Long transferId) {
-        TransferEntity t = transferRepository.findByIdForUpdate(transferId)
-                .orElseThrow(() -> new IllegalArgumentException("transfer not found"));
-
-        if (t.getStatus() != TransferStatus.PENDING_REVIEW) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "transfer is not pending review"
-            );
-        }
-
-        return t;
     }
 
     private boolean sameTransferRequest(
