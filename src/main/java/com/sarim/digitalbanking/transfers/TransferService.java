@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.sarim.digitalbanking.idempotency.IdempotencyReplayService;
+import com.sarim.digitalbanking.idempotency.IdempotencyRequestHasher;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -42,6 +44,8 @@ public class TransferService {
     private final TransferFactory transferFactory;
     private final TransferCursorCodec transferCursorCodec;
     private final TransferAdminReviewGuard transferAdminReviewGuard;
+    private final IdempotencyReplayService idempotencyReplayService;
+    private final IdempotencyRequestHasher idempotencyRequestHasher;
 
     public TransferService(
             AccountRepository accountRepository,
@@ -56,7 +60,9 @@ public class TransferService {
             TransferPersistenceService transferPersistenceService,
             TransferFactory transferFactory,
             TransferCursorCodec transferCursorCodec,
-            TransferAdminReviewGuard transferAdminReviewGuard
+            TransferAdminReviewGuard transferAdminReviewGuard,
+            IdempotencyReplayService idempotencyReplayService,
+            IdempotencyRequestHasher idempotencyRequestHasher
     ) {
         this.accountRepository = accountRepository;
         this.transferRepository = transferRepository;
@@ -71,6 +77,8 @@ public class TransferService {
         this.transferFactory = transferFactory;
         this.transferCursorCodec = transferCursorCodec;
         this.transferAdminReviewGuard = transferAdminReviewGuard;
+        this.idempotencyReplayService = idempotencyReplayService;
+        this.idempotencyRequestHasher = idempotencyRequestHasher;
     }
 
     @Transactional
@@ -108,27 +116,11 @@ public class TransferService {
             throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
         }
 
-        var existing = transferRepository.findByIdempotencyKeyAndFromAccount_User_Id(idempotencyKey, actorUserId);
-        if (existing.isPresent()) {
-            TransferEntity t = existing.get();
+        String requestHash = idempotencyRequestHasher.hashUserTransfer(actorUserId, req);
 
-            boolean same = sameTransferRequest(t, req.fromAccountId(), toAccountId, amount, currency);
-
-            if (!same) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Idempotency-Key was already used with a different request"
-                );
-            }
-
-            return transferResponseMapper.toUserResponse(t, actorUserId);
-        }
-
-        if (transferRepository.existsByIdempotencyKey(idempotencyKey)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Idempotency-Key was already used"
-            );
+        var storedReplay = idempotencyReplayService.findStoredTransferReplay(idempotencyKey, requestHash);
+        if (storedReplay.isPresent()) {
+            return storedReplay.get();
         }
 
         List<Long> ids = List.of(req.fromAccountId(), toAccountId).stream()
@@ -186,7 +178,9 @@ public class TransferService {
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
-            return transferResponseMapper.toUserResponse(t, actorUserId);
+            TransferResponse response = transferResponseMapper.toUserResponse(t, actorUserId);
+            idempotencyReplayService.storeTransferResponse(idempotencyKey, requestHash, 200, response);
+            return response;
         }
 
         UserEntity actor = userRepository.findById(actorUserId)
@@ -208,7 +202,9 @@ public class TransferService {
 
             transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
-            return transferResponseMapper.toUserResponse(t, actorUserId);
+            TransferResponse response = transferResponseMapper.toUserResponse(t, actorUserId);
+            idempotencyReplayService.storeTransferResponse(idempotencyKey, requestHash, 200, response);
+            return response;
         }
 
         transferSettlementService.applyLedgerAndBalances(t, from, to, amount, currency);
@@ -225,7 +221,9 @@ public class TransferService {
 
         transferVelocityRiskService.recordSuccessfulTransferAfterCommit(actorUserId, t.getId(), amount, riskEvaluatedAt);
 
-        return transferResponseMapper.toUserResponse(t, actorUserId);
+        TransferResponse response = transferResponseMapper.toUserResponse(t, actorUserId);
+        idempotencyReplayService.storeTransferResponse(idempotencyKey, requestHash, 200, response);
+        return response;
     }
 
     @Transactional
@@ -233,6 +231,13 @@ public class TransferService {
         long amount = req.amountCents();
         if (amount <= 0) {
             throw new IllegalArgumentException("amountCents must be > 0");
+        }
+
+        String requestHash = idempotencyRequestHasher.hashAdminDeposit(req);
+
+        var storedReplay = idempotencyReplayService.findStoredTransferReplay(idempotencyKey, requestHash);
+        if (storedReplay.isPresent()) {
+            return storedReplay.get();
         }
 
         UserEntity adminActor = transferAdminReviewGuard.requireAdminActor(adminUserId);
@@ -252,22 +257,6 @@ public class TransferService {
 
         if (req.toAccountId().equals(treasuryAccountId)) {
             throw new IllegalArgumentException("toAccountId must be different from treasury account");
-        }
-
-        var existing = transferRepository.findByIdempotencyKey(idempotencyKey);
-        if (existing.isPresent()) {
-            TransferEntity t = existing.get();
-
-            boolean same = sameTransferRequest(t, treasuryAccountId, req.toAccountId(), amount, CAD);
-
-            if (!same) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Idempotency-Key was already used with a different request"
-                );
-            }
-
-            return transferResponseMapper.toUserResponse(t, systemUser.getId());
         }
 
         List<Long> ids = List.of(treasuryAccountId, req.toAccountId()).stream()
@@ -321,7 +310,9 @@ public class TransferService {
 
         t = saveOutcome.transfer();
         if (saveOutcome.replayed()) {
-            return transferResponseMapper.toUserResponse(t, systemUser.getId());
+            TransferResponse response = transferResponseMapper.toUserResponse(t, systemUser.getId());
+            idempotencyReplayService.storeTransferResponse(idempotencyKey, requestHash, 200, response);
+            return response;
         }
 
         transferSettlementService.applyLedgerAndBalances(t, from, to, amount, CAD);
@@ -335,7 +326,9 @@ public class TransferService {
                 CAD
         );
 
-        return transferResponseMapper.toUserResponse(t, systemUser.getId());
+        TransferResponse response = transferResponseMapper.toUserResponse(t, systemUser.getId());
+        idempotencyReplayService.storeTransferResponse(idempotencyKey, requestHash, 200, response);
+        return response;
     }
 
     @Transactional(readOnly = true)
