@@ -13,7 +13,12 @@ import java.util.Optional;
 
 @Service
 public class IdempotencyReplayService {
-
+    // TODO:
+    // Current implementation stores completed responses in idempotency_keys and
+    // relies on TransferPersistenceService for duplicate-save race safety.
+    // Upgrade this to a stronger claim-state model (for example IN_PROGRESS +
+    // COMPLETED) so retries are fully protected even if a request crashes after
+    // the transfer row is saved but before the response is stored.
     private static final Duration DEFAULT_TTL = Duration.ofHours(24);
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
