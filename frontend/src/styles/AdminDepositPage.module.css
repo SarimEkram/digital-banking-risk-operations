@@ -28,11 +28,12 @@
   margin: 0 0 8px;
   font-size: 24px;
   letter-spacing: 0.2px;
+  color: var(--text);
 }
 
 .sub {
   margin: 0;
-  color: #a8b3cf;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -50,21 +51,28 @@
 
 .label {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
 }
 
 .input {
   width: 100%;
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.6);
-  color: #e5e7eb;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input:focus {
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.input:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .lookupActions,
@@ -74,48 +82,53 @@
 }
 
 .previewBox {
-  border: 1px solid #1f2a44;
-  background: rgba(15, 26, 48, 0.45);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 14px;
 }
 
 .previewLabel {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .previewValue {
   font-size: 18px;
   font-weight: 800;
-  color: #e5e7eb;
+  color: var(--text);
 }
 
 .primaryButton,
 .secondaryButton {
   appearance: none;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 10px 16px;
   font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .primaryButton {
   border: 0;
-  background: #2563eb;
+  background: var(--accent);
   color: white;
 }
 
-.secondaryButton {
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.6);
-  color: #e5e7eb;
+.primaryButton:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
-.primaryButton:hover:not(:disabled),
+.secondaryButton {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
 .secondaryButton:hover:not(:disabled) {
-  filter: brightness(1.05);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
 }
 
 .primaryButton:disabled,
@@ -127,26 +140,30 @@
 .errorBox,
 .successBox {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 14px;
-  border: 1px solid #24314f;
-  background: rgba(11, 18, 32, 0.55);
-  color: #e5e7eb;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .errorBox {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .successBox {
-  border-color: rgba(34, 197, 94, 0.35);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .lookupResultCard {
   margin-top: 18px;
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.55);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 16px;
 }
 
@@ -158,6 +175,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 800;
+  color: var(--text);
 }
 
 .resultGrid {
@@ -173,27 +191,27 @@
 }
 
 .detailBox {
-  border: 1px solid #1f2a44;
-  background: rgba(15, 26, 48, 0.45);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
   padding: 12px;
 }
 
 .detailLabel {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .detailValue {
   font-size: 13px;
-  color: #e5e7eb;
+  color: var(--text);
   word-break: break-word;
 }
 
 .detailValueMono {
   font-size: 12px;
-  color: #e5e7eb;
+  color: var(--text);
   word-break: break-word;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

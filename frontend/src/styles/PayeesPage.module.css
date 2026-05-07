@@ -25,11 +25,12 @@
   margin: 0 0 6px;
   font-size: 24px;
   letter-spacing: 0.2px;
+  color: var(--text);
 }
 
 .sub {
   margin: 0;
-  color: #a8b3cf;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -47,9 +48,9 @@
 }
 
 .panel {
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.55);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 14px;
 }
 
@@ -57,6 +58,7 @@
   margin: 0 0 10px;
   font-size: 14px;
   letter-spacing: 0.2px;
+  color: var(--text);
 }
 
 .form {
@@ -71,21 +73,23 @@
 
 .labelText {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
 }
 
 .input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.6);
-  color: #e5e7eb;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input:focus {
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .actions {
@@ -97,17 +101,19 @@
 
 .btn {
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.65);
-  color: #e5e7eb;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   cursor: pointer;
   font-weight: 700;
   letter-spacing: 0.2px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.btn:hover {
-  border-color: rgba(59, 130, 246, 0.35);
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
 }
 
 .btn:disabled {
@@ -116,34 +122,48 @@
 }
 
 .btnPrimary {
-  border-color: rgba(59, 130, 246, 0.35);
-  background: rgba(37, 99, 235, 0.2);
+  border: 0;
+  background: var(--accent);
+  color: white;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: transparent;
 }
 
 .btnDanger {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  border-color: var(--danger);
 }
 
 .hint {
   margin-top: 10px;
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   line-height: 1.35;
 }
 
 .notice {
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #24314f;
-  background: rgba(11, 18, 32, 0.9);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
   font-size: 13px;
-  color: #d1d5db;
+  color: var(--text);
 }
 
 .noticeError {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .list {
@@ -157,9 +177,9 @@
   justify-content: space-between;
   gap: 14px;
   padding: 12px;
-  border-radius: 14px;
-  border: 1px solid #1f2a44;
-  background: rgba(15, 26, 48, 0.55);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .rowLeft {
@@ -170,6 +190,7 @@
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.2px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -177,7 +198,7 @@
 
 .meta {
   margin-top: 4px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   font-size: 12px;
 }
 

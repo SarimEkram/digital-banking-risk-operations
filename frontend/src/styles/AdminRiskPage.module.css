@@ -35,27 +35,30 @@
   margin: 0 0 8px;
   font-size: 24px;
   letter-spacing: 0.2px;
+  color: var(--text);
 }
 
 .sub {
   margin: 0;
-  color: #a8b3cf;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .refreshButton {
   appearance: none;
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.6);
-  color: #e5e7eb;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .refreshButton:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.35);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
 }
 
 .refreshButton:disabled {
@@ -71,45 +74,50 @@
 }
 
 .summaryBox {
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.55);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 14px;
 }
 
 .summaryLabel {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .summaryValue {
   font-size: 20px;
   font-weight: 800;
-  color: #e5e7eb;
+  color: var(--text);
 }
 
 .errorBox,
 .successBox,
 .emptyState {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 14px;
-  border: 1px solid #24314f;
-  background: rgba(11, 18, 32, 0.55);
-  color: #e5e7eb;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .errorBox {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .successBox {
-  border-color: rgba(34, 197, 94, 0.35);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .emptyState {
-  color: #a8b3cf;
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .list {
@@ -123,9 +131,9 @@
 }
 
 .transferCard {
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.55);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 16px;
 }
 
@@ -147,13 +155,13 @@
 .transferId {
   font-size: 16px;
   font-weight: 800;
-  color: #e5e7eb;
+  color: var(--text);
 }
 
 .transferMeta {
   margin-top: 4px;
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
 }
 
 .amountRow {
@@ -161,34 +169,36 @@
   font-weight: 800;
   letter-spacing: 0.2px;
   margin-bottom: 14px;
-  color: #e5e7eb;
+  color: var(--text);
 }
 
 .statusPill {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid #24314f;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
   font-size: 12px;
-  color: #d1d5db;
-  background: rgba(15, 26, 48, 0.6);
+  color: var(--text-muted);
+  background: var(--surface);
 }
 
 .pendingPill {
-  border-color: rgba(245, 158, 11, 0.35);
-  color: #fde68a;
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .holdPill {
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #bfdbfe;
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+  background: var(--accent-soft);
 }
 
 .riskPanel {
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  background: rgba(15, 26, 48, 0.45);
-  border-radius: 16px;
+  border: 1px solid var(--warning-border);
+  background: var(--surface);
+  border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 16px;
 }
@@ -196,7 +206,7 @@
 .riskPanelHeader {
   font-size: 13px;
   font-weight: 800;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 12px;
 }
 
@@ -208,9 +218,9 @@
 }
 
 .riskBox {
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.5);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 12px;
 }
 
@@ -227,7 +237,7 @@
   justify-content: center;
   align-items: center;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 800;
   border: 1px solid transparent;
@@ -235,45 +245,45 @@
 
 .scoreLabel {
   font-size: 13px;
-  color: #e5e7eb;
+  color: var(--text);
   font-weight: 700;
 }
 
 .riskCritical {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.35);
-  color: #fecaca;
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
 }
 
 .riskHigh {
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.35);
-  color: #fde68a;
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 }
 
 .riskMedium {
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #bfdbfe;
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
 }
 
 .riskLow {
-  background: rgba(34, 197, 94, 0.14);
-  border-color: rgba(34, 197, 94, 0.35);
-  color: #bbf7d0;
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
 }
 
 .reasonPanel {
-  border: 1px solid #1f2a44;
-  background: rgba(11, 18, 32, 0.5);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius);
   padding: 12px;
 }
 
 .reasonList {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #e5e7eb;
+  color: var(--text);
 }
 
 .reasonList li + li {
@@ -288,21 +298,21 @@
 }
 
 .detailBox {
-  border: 1px solid #1f2a44;
-  background: rgba(15, 26, 48, 0.45);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
   padding: 12px;
 }
 
 .detailLabel {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .detailValue {
   font-size: 13px;
-  color: #e5e7eb;
+  color: var(--text);
   word-break: break-word;
 }
 
@@ -318,21 +328,23 @@
 
 .reasonLabel {
   font-size: 12px;
-  color: #a8b3cf;
+  color: var(--text-muted);
 }
 
 .reasonInput {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #24314f;
-  background: rgba(15, 26, 48, 0.6);
-  color: #e5e7eb;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .reasonInput:focus {
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .buttonRow {
@@ -344,27 +356,29 @@
 .approveButton,
 .rejectButton {
   appearance: none;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
-  border: 1px solid #24314f;
-  color: #e5e7eb;
+  border: 1px solid var(--border);
+  transition: filter 0.15s ease;
 }
 
 .approveButton {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
 }
 
 .rejectButton {
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
 }
 
 .approveButton:hover:not(:disabled),
 .rejectButton:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(0.95);
 }
 
 .approveButton:disabled,
@@ -382,12 +396,12 @@
 }
 
 .list::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.25);
-  border-radius: 999px;
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
 }
 
 .list::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.4);
+  background: var(--text-subtle);
 }
 
 @media (max-width: 760px) {

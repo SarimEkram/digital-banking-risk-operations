@@ -10,11 +10,12 @@
 .title {
   margin: 0 0 6px;
   font-size: 22px;
+  color: var(--text);
 }
 
 .sub {
   margin: 0;
-  color: #a8b3cf;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.4;
 }
