@@ -165,6 +165,27 @@ public abstract class IntegrationTestSupport {
         );
     }
 
+    protected JsonNode sendTransfer(
+            String senderBearerToken,
+            long fromAccountId,
+            long payeeId,
+            long amountCents,
+            String idempotencyKey
+    ) throws Exception {
+        return postJson(
+                "/api/transfers",
+                senderBearerToken,
+                idempotencyKey,
+                Map.of(
+                        "fromAccountId", fromAccountId,
+                        "payeeId", payeeId,
+                        "amountCents", amountCents,
+                        "currency", "CAD"
+                ),
+                status().isOk()
+        );
+    }
+
     protected JsonNode postJson(
             String url,
             String bearerToken,
