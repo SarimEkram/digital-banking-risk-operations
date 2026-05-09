@@ -13,6 +13,7 @@ import PayeesPage from "../features/payees/PayeesPage.jsx";
 import ActivityPage from "../features/activity/ActivityPage.jsx";
 import AdminRiskPage from "../features/admin-risk/AdminRiskPage.jsx";
 import AdminDepositPage from "../features/admin-deposit/AdminDepositPage.jsx";
+import AdminAuditPage from "../features/admin-audit/AdminAuditPage.jsx";
 
 export default function App() {
   return (
@@ -75,6 +76,15 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminRiskPage />
+            </RequireAdmin>
+          }
+        />
+
+        <Route
+          path="admin/audit"
+          element={
+            <RequireAdmin>
+              <AdminAuditPage />
             </RequireAdmin>
           }
         />

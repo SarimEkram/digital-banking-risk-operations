@@ -80,6 +80,10 @@ export default function AuthedLayout() {
                 <NavLink to="/admin/risk" className={linkClass}>
                   Admin Review
                 </NavLink>
+
+                <NavLink to="/admin/audit" className={linkClass}>
+                  Audit Log
+                </NavLink>
               </>
             )}
           </nav>
