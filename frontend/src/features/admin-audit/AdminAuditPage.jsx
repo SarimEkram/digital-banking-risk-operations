@@ -2,10 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../shared/ui/Card";
 
-import { listAudit, AUDIT_ACTIONS, ADMIN_ACTION_CODES } from "./api";
+import {
+  listAudit,
+  AUDIT_ACTIONS,
+  AUDIT_SCOPES,
+  formatAuditDetails,
+} from "./api";
 import styles from "../../styles/AdminAuditPage.module.css";
 
 const PAGE_SIZE = 50;
+
+const SCOPE_TABS = [
+  { value: AUDIT_SCOPES.SELF, label: "My audit" },
+  { value: AUDIT_SCOPES.USER, label: "User" },
+  { value: AUDIT_SCOPES.ADMIN, label: "Admin" },
+];
 
 function formatDateTime(iso) {
   try {
@@ -22,17 +33,20 @@ function formatDateTime(iso) {
   }
 }
 
-function isAdminAction(action) {
-  return ADMIN_ACTION_CODES.has(String(action || "").toUpperCase());
+function emailRequiredFor(scope) {
+  return scope === AUDIT_SCOPES.USER || scope === AUDIT_SCOPES.ADMIN;
 }
 
 export default function AdminAuditPage() {
   const navigate = useNavigate();
 
-  // Applied filters drive the actual query. The "draft" filters are what the inputs hold
-  // until the user clicks Apply; this avoids firing a request on every keystroke.
+  // "Applied" filters drive the query; "draft" filters are what the inputs hold
+  // until Apply is clicked. This avoids firing a request on every keystroke.
+  const [appliedScope, setAppliedScope] = useState(AUDIT_SCOPES.SELF);
   const [appliedAction, setAppliedAction] = useState("");
   const [appliedEmail, setAppliedEmail] = useState("");
+
+  const [draftScope, setDraftScope] = useState(AUDIT_SCOPES.SELF);
   const [draftAction, setDraftAction] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
 
@@ -46,7 +60,13 @@ export default function AdminAuditPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  async function load({ silent = false, pageOverride, actionOverride, emailOverride } = {}) {
+  async function load({
+    silent = false,
+    pageOverride,
+    scopeOverride,
+    actionOverride,
+    emailOverride,
+  } = {}) {
     if (silent) {
       setRefreshing(true);
     } else {
@@ -59,6 +79,7 @@ export default function AdminAuditPage() {
       const data = await listAudit({
         page: pageOverride ?? page,
         size: PAGE_SIZE,
+        scope: scopeOverride ?? appliedScope,
         action: actionOverride ?? appliedAction,
         email: emailOverride ?? appliedEmail,
       });
@@ -87,21 +108,62 @@ export default function AdminAuditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function onSelectScope(nextScope) {
+    setDraftScope(nextScope);
+
+    // Switching back to "My audit" doesn't need an email; apply immediately so the
+    // admin doesn't have to also click Apply. For User/Admin, the admin must enter
+    // an email and click Apply, which matches the validation contract.
+    if (nextScope === AUDIT_SCOPES.SELF) {
+      setAppliedScope(nextScope);
+      setAppliedEmail("");
+      setDraftEmail("");
+      setPage(0);
+      load({
+        pageOverride: 0,
+        scopeOverride: nextScope,
+        emailOverride: "",
+      });
+    }
+  }
+
+  const draftEmailTrimmed = draftEmail.trim();
+  const applyDisabled =
+    loading ||
+    refreshing ||
+    (emailRequiredFor(draftScope) && draftEmailTrimmed.length === 0);
+
   function onApplyFilters() {
-    // Reset to page 0 when filters change so we don't end up on a non-existent page.
+    if (applyDisabled) return;
+
+    setAppliedScope(draftScope);
     setAppliedAction(draftAction);
     setAppliedEmail(draftEmail);
     setPage(0);
-    load({ pageOverride: 0, actionOverride: draftAction, emailOverride: draftEmail });
+
+    load({
+      pageOverride: 0,
+      scopeOverride: draftScope,
+      actionOverride: draftAction,
+      emailOverride: draftEmail,
+    });
   }
 
   function onClearFilters() {
+    setDraftScope(AUDIT_SCOPES.SELF);
     setDraftAction("");
     setDraftEmail("");
+    setAppliedScope(AUDIT_SCOPES.SELF);
     setAppliedAction("");
     setAppliedEmail("");
     setPage(0);
-    load({ pageOverride: 0, actionOverride: "", emailOverride: "" });
+
+    load({
+      pageOverride: 0,
+      scopeOverride: AUDIT_SCOPES.SELF,
+      actionOverride: "",
+      emailOverride: "",
+    });
   }
 
   function onPrev() {
@@ -120,6 +182,7 @@ export default function AdminAuditPage() {
 
   const showingFrom = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
   const showingTo = Math.min((page + 1) * PAGE_SIZE, totalElements);
+  const showEmailField = emailRequiredFor(draftScope);
 
   return (
     <div className={styles.page}>
@@ -128,7 +191,7 @@ export default function AdminAuditPage() {
           <div>
             <h1 className={styles.title}>Audit Log</h1>
             <p className={styles.sub}>
-              Every action across the platform, newest first. Filter by action type or actor email.
+              Default view shows your own audit entries. Switch to User or Admin to look up another actor by email.
             </p>
           </div>
 
@@ -143,8 +206,31 @@ export default function AdminAuditPage() {
         </div>
 
         <div className={styles.filterBar}>
+          <div className={styles.scopeTabs} role="tablist" aria-label="Audit scope">
+            {SCOPE_TABS.map((tab) => {
+              const isActive = draftScope === tab.value;
+              return (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  key={tab.value}
+                  className={
+                    isActive
+                      ? `${styles.scopeTab} ${styles.scopeTabActive}`
+                      : styles.scopeTab
+                  }
+                  onClick={() => onSelectScope(tab.value)}
+                  disabled={loading || refreshing}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Action</span>
+            <span className={styles.fieldLabel}>Action (optional)</span>
             <input
               className={styles.input}
               list="audit-actions-list"
@@ -160,24 +246,33 @@ export default function AdminAuditPage() {
             </datalist>
           </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Actor email contains</span>
-            <input
-              className={styles.input}
-              type="text"
-              value={draftEmail}
-              onChange={(e) => setDraftEmail(e.target.value)}
-              placeholder="e.g. admin@bank.local"
-              disabled={loading || refreshing}
-            />
-          </label>
+          {showEmailField && (
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>
+                Actor email contains <span className={styles.requiredMark}>*</span>
+              </span>
+              <input
+                className={styles.input}
+                type="text"
+                value={draftEmail}
+                onChange={(e) => setDraftEmail(e.target.value)}
+                placeholder="required for this scope"
+                disabled={loading || refreshing}
+              />
+            </label>
+          )}
 
           <div className={styles.filterButtons}>
             <button
               type="button"
               className={styles.applyButton}
               onClick={onApplyFilters}
-              disabled={loading || refreshing}
+              disabled={applyDisabled}
+              title={
+                emailRequiredFor(draftScope) && draftEmailTrimmed.length === 0
+                  ? "Enter an email to search this scope"
+                  : ""
+              }
             >
               Apply
             </button>
@@ -188,7 +283,7 @@ export default function AdminAuditPage() {
               onClick={onClearFilters}
               disabled={loading || refreshing}
             >
-              Clear
+              Reset
             </button>
           </div>
         </div>
@@ -217,53 +312,42 @@ export default function AdminAuditPage() {
                   </tr>
                 </thead>
                 <tbody className={styles.tbody}>
-                  {items.map((row) => {
-                    const isSystem = row.actorUserId == null;
-                    const isAdminTyped = isAdminAction(row.action);
+                  {items.map((row) => (
+                    <tr key={row.id} className={styles.row}>
+                      <td className={styles.mono}>{formatDateTime(row.createdAt)}</td>
 
-                    return (
-                      <tr key={row.id} className={styles.row}>
-                        <td className={styles.mono}>{formatDateTime(row.createdAt)}</td>
+                      <td>
+                        <span className={styles.actionPill}>{row.action}</span>
+                      </td>
 
-                        <td>
-                          <span className={styles.actionPill}>{row.action}</span>
-                        </td>
+                      <td>
+                        <span className={styles.actorEmail}>
+                          {row.actorEmail || `user #${row.actorUserId ?? "—"}`}
+                        </span>
+                      </td>
 
-                        <td>
-                          {isSystem ? (
-                            <span className={`${styles.tag} ${styles.tagSystem}`}>system</span>
-                          ) : (
-                            <div className={styles.actorCell}>
-                              <span className={styles.actorEmail}>
-                                {row.actorEmail || `user #${row.actorUserId}`}
-                              </span>
-                              {isAdminTyped && (
-                                <span className={`${styles.tag} ${styles.tagAdmin}`}>admin</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
+                      <td>
+                        <div className={styles.entityCell}>
+                          <span className={styles.entityType}>{row.entityType}</span>
+                          <span className={styles.entityId}>#{row.entityId}</span>
+                        </div>
+                      </td>
 
-                        <td>
-                          <div className={styles.entityCell}>
-                            <span className={styles.entityType}>{row.entityType}</span>
-                            <span className={styles.entityId}>#{row.entityId}</span>
+                      <td className={styles.details}>
+                        <div className={styles.detailsText}>
+                          {formatAuditDetails(row.action, row.details)}
+                        </div>
+                        {row.correlationId && (
+                          <div
+                            className={styles.correlationId}
+                            title={row.correlationId}
+                          >
+                            cid: {row.correlationId}
                           </div>
-                        </td>
-
-                        <td className={styles.details}>
-                          <div className={styles.detailsText} title={row.details || ""}>
-                            {row.details || "-"}
-                          </div>
-                          {row.correlationId && (
-                            <div className={styles.correlationId} title={row.correlationId}>
-                              cid: {row.correlationId}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

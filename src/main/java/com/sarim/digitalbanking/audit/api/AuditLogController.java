@@ -22,6 +22,10 @@ public class AuditLogController {
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int MAX_PAGE_SIZE = 100;
 
+    private static final String SCOPE_SELF = "self";
+    private static final String SCOPE_USER = "user";
+    private static final String SCOPE_ADMIN = "admin";
+
     private final AuditLogRepository auditLogRepository;
     private final TransferAdminReviewGuard transferAdminReviewGuard;
 
@@ -33,10 +37,21 @@ public class AuditLogController {
         this.transferAdminReviewGuard = transferAdminReviewGuard;
     }
 
+    /**
+     * Lists audit rows for the admin-facing audit page.
+     *
+     * The "scope" parameter shapes the query:
+     *   - "self"  (default): only the logged-in admin's own actions
+     *   - "user"           : USER-role actors; email is required to narrow the search
+     *   - "admin"          : ADMIN-role actors; email is required to narrow the search
+     *
+     * The action parameter optionally narrows by action code (TRANSFER_CREATE, etc.).
+     */
     @GetMapping
     public AuditLogPageResponse list(
             @RequestParam(name = "page", required = false, defaultValue = "0") int page,
             @RequestParam(name = "size", required = false, defaultValue = "50") int size,
+            @RequestParam(name = "scope", required = false, defaultValue = SCOPE_SELF) String scope,
             @RequestParam(name = "action", required = false) String action,
             @RequestParam(name = "email", required = false) String email,
             HttpServletRequest request
@@ -52,10 +67,47 @@ public class AuditLogController {
 
         String safeAction = (action == null || action.isBlank()) ? null : action.trim();
         String safeEmail = (email == null || email.isBlank()) ? null : email.trim();
+        String safeScope = (scope == null || scope.isBlank()) ? SCOPE_SELF : scope.trim().toLowerCase();
+
+        Long actorUserId;
+        String actorRole;
+
+        switch (safeScope) {
+            case SCOPE_SELF -> {
+                actorUserId = adminUserId;
+                actorRole = null;
+            }
+            case SCOPE_USER -> {
+                if (safeEmail == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "email is required when scope is 'user'"
+                    );
+                }
+                actorUserId = null;
+                actorRole = "USER";
+            }
+            case SCOPE_ADMIN -> {
+                if (safeEmail == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "email is required when scope is 'admin'"
+                    );
+                }
+                actorUserId = null;
+                actorRole = "ADMIN";
+            }
+            default -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "scope must be one of: self, user, admin"
+            );
+        }
 
         Page<AuditLogEntity> result = auditLogRepository.search(
                 safeAction,
                 safeEmail,
+                actorRole,
+                actorUserId,
                 PageRequest.of(safePage, safeSize)
         );
 

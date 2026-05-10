@@ -80,6 +80,58 @@
   padding: 12px;
 }
 
+/* --- scope tabs (My audit / User / Admin) --- */
+.scopeTabs {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+  height: 42px;
+  align-self: flex-end;
+}
+
+.scopeTab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 100%;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.scopeTab:hover:not(:disabled):not(.scopeTabActive) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.scopeTab:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.scopeTabActive {
+  background: var(--accent);
+  color: white;
+}
+
+.scopeTabActive:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.requiredMark {
+  color: var(--danger);
+  font-weight: 800;
+  margin-left: 2px;
+}
+
 .field {
   display: grid;
   gap: 6px;
