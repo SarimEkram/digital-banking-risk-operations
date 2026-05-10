@@ -18,6 +18,29 @@ const SCOPE_TABS = [
   { value: AUDIT_SCOPES.ADMIN, label: "Admin" },
 ];
 
+// Maps an action code to a visual tone for its pill in the table.
+// Unknown actions fall through to the default (blue) styling.
+const ACTION_TONES = {
+  TRANSFER_APPROVE: "good",
+  TRANSFER_CREATE: "good",
+  ADMIN_DEPOSIT: "good",
+  PAYEE_ADD: "good",
+  PAYEE_ENABLE: "good",
+
+  TRANSFER_REJECT: "bad",
+  PAYEE_DISABLE: "bad",
+
+  TRANSFER_HELD: "warn",
+};
+
+function getActionPillClass(action) {
+  const tone = ACTION_TONES[String(action || "").toUpperCase()];
+  if (tone === "good") return `${styles.actionPill} ${styles.actionPillGood}`;
+  if (tone === "bad") return `${styles.actionPill} ${styles.actionPillBad}`;
+  if (tone === "warn") return `${styles.actionPill} ${styles.actionPillWarn}`;
+  return styles.actionPill;
+}
+
 function formatDateTime(iso) {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -317,7 +340,7 @@ export default function AdminAuditPage() {
                       <td className={styles.mono}>{formatDateTime(row.createdAt)}</td>
 
                       <td>
-                        <span className={styles.actionPill}>{row.action}</span>
+                        <span className={getActionPillClass(row.action)}>{row.action}</span>
                       </td>
 
                       <td>

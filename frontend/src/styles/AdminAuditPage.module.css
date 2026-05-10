@@ -281,6 +281,24 @@
   white-space: nowrap;
 }
 
+.actionPillGood {
+  border-color: var(--success-border);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.actionPillBad {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+.actionPillWarn {
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+  background: var(--warning-bg);
+}
+
 /* --- actor cell --- */
 .actorCell {
   display: flex;
