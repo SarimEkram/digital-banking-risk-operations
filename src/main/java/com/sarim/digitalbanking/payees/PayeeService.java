@@ -54,7 +54,7 @@ public class PayeeService {
                     p.setLabel(req.label().trim());
                 }
                 PayeeEntity saved = payeeRepository.save(p);
-                audit(ownerUserId, "PAYEE_ENABLE", "payee", String.valueOf(saved.getId()),
+                audit(ownerUserId, payeeUser, "PAYEE_ENABLE", "payee", String.valueOf(saved.getId()),
                         "payee_email=" + saved.getPayeeEmail() + ", payee_user_id=" + payeeUser.getId());
                 return toResponse(saved);
             }
@@ -75,7 +75,7 @@ public class PayeeService {
         PayeeEntity saved = payeeRepository.saveAndFlush(p);
         entityManager.refresh(saved);
 
-        audit(ownerUserId, "PAYEE_ADD", "payee", String.valueOf(saved.getId()),
+        audit(ownerUserId, payeeUser, "PAYEE_ADD", "payee", String.valueOf(saved.getId()),
                 "payee_email=" + saved.getPayeeEmail() + ", payee_user_id=" + payeeUser.getId());
 
         return toResponse(saved);
@@ -98,7 +98,7 @@ public class PayeeService {
             p.setStatus("DISABLED");
             payeeRepository.save(p);
 
-            audit(ownerUserId, "PAYEE_DISABLE", "payee", String.valueOf(p.getId()),
+            audit(ownerUserId, p.getPayeeUser(), "PAYEE_DISABLE", "payee", String.valueOf(p.getId()),
                     "payee_email=" + p.getPayeeEmail() + ", payee_user_id=" + p.getPayeeUser().getId());
         }
 
@@ -115,12 +115,13 @@ public class PayeeService {
         );
     }
 
-    private void audit(Long actorUserId, String action, String entityType, String entityId, String details) {
+    private void audit(Long actorUserId, UserEntity affectedUser, String action, String entityType, String entityId, String details) {
         UserEntity actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         AuditLogEntity log = new AuditLogEntity();
         log.setActorUser(actor);
+        log.setAffectedUser(affectedUser);
         log.setAction(action);
         log.setEntityType(entityType);
         log.setEntityId(entityId);

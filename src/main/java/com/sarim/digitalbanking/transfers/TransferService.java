@@ -191,6 +191,7 @@ public class TransferService {
 
             transferAuditService.logTransferHeld(
                     actor,
+                    to.getUser(),
                     t.getId(),
                     from.getId(),
                     payee.getId(),
@@ -211,6 +212,7 @@ public class TransferService {
 
         transferAuditService.logTransferCreate(
                 actor,
+                to.getUser(),
                 t.getId(),
                 from.getId(),
                 payee.getId(),
@@ -319,6 +321,7 @@ public class TransferService {
 
         transferAuditService.logAdminDeposit(
                 adminActor,
+                to.getUser(),
                 t.getId(),
                 from.getId(),
                 to.getId(),
@@ -401,6 +404,7 @@ public class TransferService {
 
         transferAuditService.logTransferApprove(
                 adminActor,
+                to.getUser(),
                 t.getId(),
                 to.getId(),
                 t.getAmountCents(),
@@ -439,6 +443,7 @@ public class TransferService {
 
         transferAuditService.logTransferReject(
                 adminActor,
+                from.getUser(),
                 t.getId(),
                 from.getId(),
                 t.getAmountCents(),
