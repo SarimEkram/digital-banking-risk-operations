@@ -17,6 +17,10 @@ public class AuditLogEntity {
     @JoinColumn(name = "actor_user_id")
     private UserEntity actorUser;
 
+    @ManyToOne(optional = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "affected_user_id")
+    private UserEntity affectedUser;
+
     @Column(name = "action", nullable = false)
     private String action;
 
@@ -41,6 +45,9 @@ public class AuditLogEntity {
 
     public UserEntity getActorUser() { return actorUser; }
     public void setActorUser(UserEntity actorUser) { this.actorUser = actorUser; }
+
+    public UserEntity getAffectedUser() { return affectedUser; }
+    public void setAffectedUser(UserEntity affectedUser) { this.affectedUser = affectedUser; }
 
     public String getAction() { return action; }
     public void setAction(String action) { this.action = action; }
