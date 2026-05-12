@@ -37,16 +37,6 @@ public class AuditLogController {
         this.transferAdminReviewGuard = transferAdminReviewGuard;
     }
 
-    /**
-     * Lists audit rows for the admin-facing audit page.
-     *
-     * The "scope" parameter shapes the query:
-     *   - "self"  (default): only the logged-in admin's own actions
-     *   - "user"           : USER-role actors; email is required to narrow the search
-     *   - "admin"          : ADMIN-role actors; email is required to narrow the search
-     *
-     * The action parameter optionally narrows by action code (TRANSFER_CREATE, etc.).
-     */
     @GetMapping
     public AuditLogPageResponse list(
             @RequestParam(name = "page", required = false, defaultValue = "0") int page,
@@ -57,9 +47,6 @@ public class AuditLogController {
             HttpServletRequest request
     ) {
         Long adminUserId = requireUid(request);
-
-        // Defense-in-depth: SecurityConfig already restricts /api/admin/** to ADMIN role,
-        // but we re-verify the actor's role from the database to match listHeldTransfers.
         transferAdminReviewGuard.requireAdminActor(adminUserId);
 
         int safePage = Math.max(0, page);
@@ -127,10 +114,14 @@ public class AuditLogController {
     private static AuditLogResponse toResponse(AuditLogEntity a) {
         Long actorUserId = a.getActorUser() == null ? null : a.getActorUser().getId();
         String actorEmail = a.getActorUser() == null ? null : a.getActorUser().getEmail();
+        Long affectedUserId = a.getAffectedUser() == null ? null : a.getAffectedUser().getId();
+        String affectedEmail = a.getAffectedUser() == null ? null : a.getAffectedUser().getEmail();
         return new AuditLogResponse(
                 a.getId(),
                 actorUserId,
                 actorEmail,
+                affectedUserId,
+                affectedEmail,
                 a.getAction(),
                 a.getEntityType(),
                 a.getEntityId(),

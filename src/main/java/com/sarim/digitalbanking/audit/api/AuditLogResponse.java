@@ -6,6 +6,8 @@ public record AuditLogResponse(
         Long id,
         Long actorUserId,
         String actorEmail,
+        Long affectedUserId,
+        String affectedEmail,
         String action,
         String entityType,
         String entityId,

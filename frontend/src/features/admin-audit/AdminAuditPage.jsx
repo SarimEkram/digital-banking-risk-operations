@@ -18,8 +18,6 @@ const SCOPE_TABS = [
   { value: AUDIT_SCOPES.ADMIN, label: "Admin" },
 ];
 
-// Maps an action code to a visual tone for its pill in the table.
-// Unknown actions fall through to the default (blue) styling.
 const ACTION_TONES = {
   TRANSFER_APPROVE: "good",
   TRANSFER_CREATE: "good",
@@ -63,8 +61,6 @@ function emailRequiredFor(scope) {
 export default function AdminAuditPage() {
   const navigate = useNavigate();
 
-  // "Applied" filters drive the query; "draft" filters are what the inputs hold
-  // until Apply is clicked. This avoids firing a request on every keystroke.
   const [appliedScope, setAppliedScope] = useState(AUDIT_SCOPES.SELF);
   const [appliedAction, setAppliedAction] = useState("");
   const [appliedEmail, setAppliedEmail] = useState("");
@@ -134,9 +130,6 @@ export default function AdminAuditPage() {
   function onSelectScope(nextScope) {
     setDraftScope(nextScope);
 
-    // Switching back to "My audit" doesn't need an email; apply immediately so the
-    // admin doesn't have to also click Apply. For User/Admin, the admin must enter
-    // an email and click Apply, which matches the validation contract.
     if (nextScope === AUDIT_SCOPES.SELF) {
       setAppliedScope(nextScope);
       setAppliedEmail("");
@@ -272,14 +265,14 @@ export default function AdminAuditPage() {
           {showEmailField && (
             <label className={styles.field}>
               <span className={styles.fieldLabel}>
-                Actor email contains <span className={styles.requiredMark}>*</span>
+                Email contains <span className={styles.requiredMark}>*</span>
               </span>
               <input
                 className={styles.input}
                 type="text"
                 value={draftEmail}
                 onChange={(e) => setDraftEmail(e.target.value)}
-                placeholder="required for this scope"
+                placeholder="matches actor or affected user"
                 disabled={loading || refreshing}
               />
             </label>
@@ -330,6 +323,7 @@ export default function AdminAuditPage() {
                     <th>When</th>
                     <th>Action</th>
                     <th>Actor</th>
+                    <th>Affected</th>
                     <th>Entity</th>
                     <th>Details</th>
                   </tr>
@@ -347,6 +341,16 @@ export default function AdminAuditPage() {
                         <span className={styles.actorEmail}>
                           {row.actorEmail || `user #${row.actorUserId ?? "—"}`}
                         </span>
+                      </td>
+
+                      <td>
+                        {row.affectedUserId ? (
+                          <span className={styles.actorEmail}>
+                            {row.affectedEmail || `user #${row.affectedUserId}`}
+                          </span>
+                        ) : (
+                          <span className={styles.affectedEmpty}>—</span>
+                        )}
                       </td>
 
                       <td>

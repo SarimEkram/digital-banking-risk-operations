@@ -12,7 +12,7 @@
 
 .card {
   width: 100% !important;
-  max-width: 1200px !important;
+  max-width: 1600px !important;
   padding: 28px !important;
   border-radius: 18px !important;
   height: 100%;
@@ -225,7 +225,7 @@
 
 .table {
   width: 100%;
-  min-width: 900px;
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -299,41 +299,14 @@
   background: var(--warning-bg);
 }
 
-/* --- actor cell --- */
-.actorCell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
+/* --- actor / affected --- */
 .actorEmail {
   word-break: break-word;
 }
 
-/* --- tags (system / admin) --- */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-}
-
-.tagSystem {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-  color: var(--text-muted);
-}
-
-.tagAdmin {
-  background: var(--warning-bg);
-  border-color: var(--warning-border);
-  color: var(--warning-text);
+.affectedEmpty {
+  color: var(--text-subtle);
+  font-weight: 700;
 }
 
 /* --- entity cell --- */
