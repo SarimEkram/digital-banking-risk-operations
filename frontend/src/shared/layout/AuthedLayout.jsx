@@ -81,6 +81,10 @@ export default function AuthedLayout() {
                   Admin Review
                 </NavLink>
 
+                <NavLink to="/admin/find-user" className={linkClass}>
+                  Manage Accounts
+                </NavLink>
+
                 <NavLink to="/admin/audit" className={linkClass}>
                   Audit Log
                 </NavLink>
