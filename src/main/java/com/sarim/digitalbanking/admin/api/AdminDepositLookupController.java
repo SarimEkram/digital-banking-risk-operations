@@ -55,6 +55,7 @@ public class AdminDepositLookupController {
         return new AdminAccountLookupResponse(
                 user.getId(),
                 user.getEmail(),
+                user.getRole().name(),
                 account.getId(),
                 account.getCurrency(),
                 account.getStatus(),

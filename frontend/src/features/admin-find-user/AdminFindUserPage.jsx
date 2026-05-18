@@ -184,107 +184,130 @@ export default function AdminFindUserPage() {
                 </div>
 
                 <div className={styles.detailBox}>
-                  <div className={styles.detailLabel}>Account Count</div>
+                  <div className={styles.detailLabel}>Role</div>
                   <div className={styles.detailValue}>
-                    1 account (full list coming with backend update)
+                    <span className={selectedUser.role === "ADMIN" ? styles.statusPill : `${styles.statusPill} ${styles.statusActive}`}>
+                      {selectedUser.role || "USER"}
+                    </span>
                   </div>
                 </div>
-              </div>
-            </section>
 
-            {/* Accounts List */}
-            <section className={styles.accountsList}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Accounts</h2>
-              </div>
-
-              <div className={styles.accountCard}>
-                <div className={styles.accountHeader}>
-                  <div className={styles.accountId}>
-                    Account #{selectedUser.accountId}
-                  </div>
-                  <span className={getStatusClass(selectedUser.status)}>
-                    {selectedUser.status}
-                  </span>
-                </div>
-
-                <div className={styles.detailGrid}>
+                {selectedUser.role !== "ADMIN" && (
                   <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>Currency</div>
-                    <div className={styles.detailValue}>{selectedUser.currency}</div>
-                  </div>
-
-                  <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>Balance</div>
+                    <div className={styles.detailLabel}>Account Count</div>
                     <div className={styles.detailValue}>
-                      {formatMoney(selectedUser.balanceCents, selectedUser.currency)}
+                      1 account (full list coming with backend update)
                     </div>
                   </div>
+                )}
+              </div>
+            </section>
 
-                  <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>Account Type</div>
-                    <div className={styles.detailValue}>CHEQUING</div>
+            {selectedUser.role === "ADMIN" ? (
+              /* Admin-specific view */
+              <section className={styles.placeholderSection}>
+                <p className={styles.placeholderText}>
+                  Admin users do not have transferable accounts. View this admin's activity in the Audit Log section.
+                </p>
+              </section>
+            ) : (
+              /* Regular user view with accounts and actions */
+              <>
+                {/* Accounts List */}
+                <section className={styles.accountsList}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Accounts</h2>
                   </div>
-                </div>
 
-                <div className={styles.accountActions} style={{ marginTop: "12px" }}>
-                  <button
-                    type="button"
-                    className={styles.actionButton}
-                    disabled
-                    title="Backend endpoint coming soon"
-                  >
-                    Freeze Account
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.actionButton}
-                    disabled
-                    title="Backend endpoint coming soon"
-                  >
-                    Unfreeze Account
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.actionButton}
-                    disabled
-                    title="Backend endpoint coming soon"
-                  >
-                    Close Account
-                  </button>
-                </div>
-              </div>
-            </section>
+                  <div className={styles.accountCard}>
+                    <div className={styles.accountHeader}>
+                      <div className={styles.accountId}>
+                        Account #{selectedUser.accountId}
+                      </div>
+                      <span className={getStatusClass(selectedUser.status)}>
+                        {selectedUser.status}
+                      </span>
+                    </div>
 
-            {/* Recent Transfers - Placeholder */}
-            <section className={styles.placeholderSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Recent Transfers</h2>
-              </div>
-              <p className={styles.placeholderText}>
-                Recent transfer history will appear here once the backend endpoint is ready.
-              </p>
-            </section>
+                    <div className={styles.detailGrid}>
+                      <div className={styles.detailBox}>
+                        <div className={styles.detailLabel}>Currency</div>
+                        <div className={styles.detailValue}>{selectedUser.currency}</div>
+                      </div>
 
-            {/* Held Transfers - Placeholder */}
-            <section className={styles.placeholderSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Held Transfers</h2>
-              </div>
-              <p className={styles.placeholderText}>
-                Pending/held transfers for this user will appear here with approve/reject actions once the backend endpoint is ready.
-              </p>
-            </section>
+                      <div className={styles.detailBox}>
+                        <div className={styles.detailLabel}>Balance</div>
+                        <div className={styles.detailValue}>
+                          {formatMoney(selectedUser.balanceCents, selectedUser.currency)}
+                        </div>
+                      </div>
 
-            {/* Admin Deposits - Placeholder */}
-            <section className={styles.placeholderSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Recent Admin Deposits</h2>
-              </div>
-              <p className={styles.placeholderText}>
-                Recent admin deposits to this user will appear here once the backend endpoint is ready.
-              </p>
-            </section>
+                      <div className={styles.detailBox}>
+                        <div className={styles.detailLabel}>Account Type</div>
+                        <div className={styles.detailValue}>CHEQUING</div>
+                      </div>
+                    </div>
+
+                    <div className={styles.accountActions} style={{ marginTop: "12px" }}>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        disabled
+                        title="Backend endpoint coming soon"
+                      >
+                        Freeze Account
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        disabled
+                        title="Backend endpoint coming soon"
+                      >
+                        Unfreeze Account
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        disabled
+                        title="Backend endpoint coming soon"
+                      >
+                        Close Account
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Recent Transfers - Placeholder */}
+                <section className={styles.placeholderSection}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Recent Transfers</h2>
+                  </div>
+                  <p className={styles.placeholderText}>
+                    Recent transfer history will appear here once the backend endpoint is ready.
+                  </p>
+                </section>
+
+                {/* Held Transfers - Placeholder */}
+                <section className={styles.placeholderSection}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Held Transfers</h2>
+                  </div>
+                  <p className={styles.placeholderText}>
+                    Pending/held transfers for this user will appear here with approve/reject actions once the backend endpoint is ready.
+                  </p>
+                </section>
+
+                {/* Admin Deposits - Placeholder */}
+                <section className={styles.placeholderSection}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Recent Admin Deposits</h2>
+                  </div>
+                  <p className={styles.placeholderText}>
+                    Recent admin deposits to this user will appear here once the backend endpoint is ready.
+                  </p>
+                </section>
+              </>
+            )}
           </>
         )}
       </Card>
