@@ -12,12 +12,73 @@ function buildError(status, body) {
   return err;
 }
 
-// Temporarily reusing the deposit lookup endpoint until we build the full user lookup endpoint
+// Lookup user by email (temporary - uses deposit lookup endpoint)
 export async function lookupUserByEmail(email) {
   const trimmed = String(email || "").trim();
 
   const { ok, status, body } = await apiRequest(
     `/api/admin/deposit/lookup?email=${encodeURIComponent(trimmed)}`
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Get all accounts for a user
+export async function getUserAccounts(userId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/users/${userId}/accounts`
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Freeze an account
+export async function freezeAccount(accountId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/accounts/${accountId}/freeze`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Unfreeze an account
+export async function unfreezeAccount(accountId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/accounts/${accountId}/unfreeze`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Close an account
+export async function closeAccount(accountId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/accounts/${accountId}/close`,
+    {
+      method: "POST",
+    }
   );
 
   if (!ok) {
