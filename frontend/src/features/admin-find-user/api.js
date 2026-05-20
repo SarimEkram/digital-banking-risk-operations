@@ -12,12 +12,12 @@ function buildError(status, body) {
   return err;
 }
 
-// Lookup user by email (temporary - uses deposit lookup endpoint)
+// Lookup user by email - returns user with all accounts regardless of status
 export async function lookupUserByEmail(email) {
   const trimmed = String(email || "").trim();
 
   const { ok, status, body } = await apiRequest(
-    `/api/admin/deposit/lookup?email=${encodeURIComponent(trimmed)}`
+    `/api/admin/users/lookup?email=${encodeURIComponent(trimmed)}`
   );
 
   if (!ok) {
@@ -75,7 +75,7 @@ export async function unfreezeAccount(accountId) {
 // Close an account
 export async function closeAccount(accountId) {
   const { ok, status, body } = await apiRequest(
-    `/api/admin/accounts/${accountId}/close`,
+    `/api/admin/accounts/{accountId}/close`,
     {
       method: "POST",
     }

@@ -100,18 +100,9 @@ export default function AdminFindUserPage() {
       setSelectedUser(result);
       setSuccess(`Found user: ${result.email}`);
 
-      // For USER role, load all accounts
-      if (result.role !== "ADMIN") {
-        setAccountsLoading(true);
-        try {
-          const accountsData = await getUserAccounts(result.userId);
-          setUserAccounts(accountsData.accounts || []);
-        } catch (accErr) {
-          console.error("Failed to load accounts:", accErr);
-          setError("Failed to load user accounts.");
-        } finally {
-          setAccountsLoading(false);
-        }
+      // New lookup endpoint returns accounts directly
+      if (result.role !== "ADMIN" && result.accounts) {
+        setUserAccounts(result.accounts);
       }
     } catch (err) {
       if (err?.status === 401) {
