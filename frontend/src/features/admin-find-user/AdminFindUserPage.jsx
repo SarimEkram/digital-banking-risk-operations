@@ -8,7 +8,10 @@ import {
   getUserAccounts,
   freezeAccount,
   unfreezeAccount,
-  closeAccount
+  closeAccount,
+  getUserActivitySummary,
+  getUserRiskProfile,
+  getUserPayees
 } from "./api";
 import styles from "../../styles/AdminFindUserPage.module.css";
 
@@ -32,6 +35,34 @@ function getStatusClass(status) {
   return styles.statusPill;
 }
 
+function formatDateTime(iso) {
+  if (!iso) return "-";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 export default function AdminFindUserPage() {
   const navigate = useNavigate();
 
@@ -41,7 +72,11 @@ export default function AdminFindUserPage() {
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [userAccounts, setUserAccounts] = useState([]);
-  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [activitySummary, setActivitySummary] = useState([]);
+  const [riskProfile, setRiskProfile] = useState(null);
+  const [riskLimit, setRiskLimit] = useState(5);
+  const [payees, setPayees] = useState([]);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -86,6 +121,9 @@ export default function AdminFindUserPage() {
     setSuccess("");
     setSelectedUser(null);
     setUserAccounts([]);
+    setActivitySummary([]);
+    setRiskProfile(null);
+    setPayees([]);
 
     const trimmed = String(searchEmail || "").trim();
     if (!trimmed) {
@@ -103,6 +141,20 @@ export default function AdminFindUserPage() {
       // New lookup endpoint returns accounts directly
       if (result.role !== "ADMIN" && result.accounts) {
         setUserAccounts(result.accounts);
+
+        // Load additional insights for USER role
+        try {
+          const [activity, risk, payeesList] = await Promise.all([
+            getUserActivitySummary(result.userId),
+            getUserRiskProfile(result.userId, riskLimit),
+            getUserPayees(result.userId)
+          ]);
+          setActivitySummary(activity);
+          setRiskProfile(risk);
+          setPayees(payeesList);
+        } catch (insightErr) {
+          console.error("Failed to load user insights:", insightErr);
+        }
       }
     } catch (err) {
       if (err?.status === 401) {
@@ -191,218 +243,416 @@ export default function AdminFindUserPage() {
       setError(err?.message || "Failed to close account.");
     }
   }
-  if (checkingRole) {
-      return (
-        <div className={styles.page}>
-          <Card className={styles.card}>
-            <h1 className={styles.title}>Manage Accounts</h1>
-            <p className={styles.sub}>Checking admin access...</p>
-          </Card>
-        </div>
-      );
-    }
 
+  async function handleRiskLimitChange(newLimit) {
+    setRiskLimit(newLimit);
+
+    if (!selectedUser?.userId) return;
+
+    try {
+      const risk = await getUserRiskProfile(selectedUser.userId, newLimit);
+      setRiskProfile(risk);
+    } catch (err) {
+      console.error("Failed to reload risk profile:", err);
+    }
+  }
+
+  if (checkingRole) {
     return (
       <div className={styles.page}>
         <Card className={styles.card}>
-          <div className={styles.header}>
-            <div>
-              <h1 className={styles.title}>Manage Accounts</h1>
-              <p className={styles.sub}>
-                Search for a user by email to view their accounts, recent activity, and manage account status.
-              </p>
-            </div>
-          </div>
-
-          <form className={styles.searchForm} onSubmit={onSearch}>
-            <label className={styles.field}>
-              <span className={styles.label}>User email</span>
-              <input
-                className={styles.input}
-                type="email"
-                value={searchEmail}
-                onChange={(e) => onChangeEmail(e.target.value)}
-                placeholder="e.g. user@example.com"
-                disabled={searchLoading}
-              />
-            </label>
-
-            <div className={styles.searchActions}>
-              <button
-                type="submit"
-                className={styles.primaryButton}
-                disabled={searchLoading}
-              >
-                {searchLoading ? "Searching..." : "Search User"}
-              </button>
-            </div>
-          </form>
-
-          {error && <div className={styles.errorBox}>{error}</div>}
-          {success && <div className={styles.successBox}>{success}</div>}
-
-          {selectedUser && (
-            <>
-              {/* User Details */}
-              <section className={styles.userDetailsSection}>
-                <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>User Details</h2>
-                </div>
-
-                <div className={styles.detailGrid}>
-                  <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>User ID</div>
-                    <div className={styles.detailValue}>{selectedUser.userId}</div>
-                  </div>
-
-                  <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>Email</div>
-                    <div className={styles.detailValue}>{selectedUser.email}</div>
-                  </div>
-
-                  <div className={styles.detailBox}>
-                    <div className={styles.detailLabel}>Role</div>
-                    <div className={styles.detailValue}>
-                      <span className={selectedUser.role === "ADMIN" ? styles.statusPill : `${styles.statusPill} ${styles.statusActive}`}>
-                        {selectedUser.role || "USER"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedUser.role !== "ADMIN" && (
-                    <div className={styles.detailBox}>
-                      <div className={styles.detailLabel}>Account Count</div>
-                      <div className={styles.detailValue}>
-                        {accountsLoading ? "Loading..." : `${userAccounts.length} account(s)`}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {selectedUser.role === "ADMIN" ? (
-                /* Admin-specific view */
-                <section className={styles.placeholderSection}>
-                  <p className={styles.placeholderText}>
-                    Admin users do not have transferable accounts. View this admin's activity in the Audit Log section.
-                  </p>
-                </section>
-              ) : (
-                /* Regular user view with accounts and actions */
-                <>
-                  {/* Accounts List */}
-                  <section className={styles.accountsList}>
-                    <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Accounts</h2>
-                    </div>
-
-                    {accountsLoading ? (
-                      <p className={styles.placeholderText}>Loading accounts...</p>
-                    ) : userAccounts.length === 0 ? (
-                      <p className={styles.placeholderText}>No accounts found for this user.</p>
-                    ) : (
-                      userAccounts.map((account) => (
-                        <div key={account.accountId} className={styles.accountCard}>
-                          <div className={styles.accountHeader}>
-                            <div className={styles.accountId}>
-                              Account #{account.accountId}
-                            </div>
-                            <span className={getStatusClass(account.status)}>
-                              {account.status}
-                            </span>
-                          </div>
-
-                          <div className={styles.detailGrid}>
-                            <div className={styles.detailBox}>
-                              <div className={styles.detailLabel}>Account Type</div>
-                              <div className={styles.detailValue}>{account.accountType}</div>
-                            </div>
-
-                            <div className={styles.detailBox}>
-                              <div className={styles.detailLabel}>Currency</div>
-                              <div className={styles.detailValue}>{account.currency}</div>
-                            </div>
-
-                            <div className={styles.detailBox}>
-                              <div className={styles.detailLabel}>Balance</div>
-                              <div className={styles.detailValue}>
-                                {formatMoney(account.balanceCents, account.currency)}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={styles.accountActions} style={{ marginTop: "12px" }}>
-                            {account.status.toUpperCase() === "ACTIVE" && (
-                              <button
-                                type="button"
-                                className={styles.actionButton}
-                                onClick={() => handleFreezeAccount(account.accountId)}
-                              >
-                                Freeze Account
-                              </button>
-                            )}
-
-                            {account.status.toUpperCase() === "FROZEN" && (
-                              <button
-                                type="button"
-                                className={styles.actionButton}
-                                onClick={() => handleUnfreezeAccount(account.accountId)}
-                              >
-                                Unfreeze Account
-                              </button>
-                            )}
-
-                            {(account.status.toUpperCase() === "ACTIVE" || account.status.toUpperCase() === "FROZEN") && (
-                              <button
-                                type="button"
-                                className={styles.actionButton}
-                                onClick={() => handleCloseAccount(account.accountId)}
-                                disabled={account.balanceCents !== 0}
-                                title={account.balanceCents !== 0 ? "Cannot close account with non-zero balance" : ""}
-                              >
-                                Close Account
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </section>
-
-                  {/* Recent Transfers - Placeholder */}
-                  <section className={styles.placeholderSection}>
-                    <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Recent Transfers</h2>
-                    </div>
-                    <p className={styles.placeholderText}>
-                      Recent transfer history will appear here once the backend endpoint is ready.
-                    </p>
-                  </section>
-
-                  {/* Held Transfers - Placeholder */}
-                  <section className={styles.placeholderSection}>
-                    <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Held Transfers</h2>
-                    </div>
-                    <p className={styles.placeholderText}>
-                      Pending/held transfers for this user will appear here with approve/reject actions once the backend endpoint is ready.
-                    </p>
-                  </section>
-
-                  {/* Admin Deposits - Placeholder */}
-                  <section className={styles.placeholderSection}>
-                    <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Recent Admin Deposits</h2>
-                    </div>
-                    <p className={styles.placeholderText}>
-                      Recent admin deposits to this user will appear here once the backend endpoint is ready.
-                    </p>
-                  </section>
-                </>
-              )}
-            </>
-          )}
+          <h1 className={styles.title}>Manage Accounts</h1>
+          <p className={styles.sub}>Checking admin access...</p>
         </Card>
       </div>
     );
   }
+
+  return (
+    <div className={styles.page}>
+      <Card className={styles.card}>
+        <div className={styles.header}>
+          <div>
+            <h1 className={styles.title}>Manage Accounts</h1>
+            <p className={styles.sub}>
+              Search for a user by email to view their accounts, recent activity, and manage account status.
+            </p>
+          </div>
+        </div>
+
+        <form className={styles.searchForm} onSubmit={onSearch}>
+          <label className={styles.field}>
+            <span className={styles.label}>User email</span>
+            <input
+              className={styles.input}
+              type="email"
+              value={searchEmail}
+              onChange={(e) => onChangeEmail(e.target.value)}
+              placeholder="e.g. user@example.com"
+              disabled={searchLoading}
+            />
+          </label>
+
+          <div className={styles.searchActions}>
+            <button
+              type="submit"
+              className={styles.primaryButton}
+              disabled={searchLoading}
+            >
+              {searchLoading ? "Searching..." : "Search User"}
+            </button>
+          </div>
+        </form>
+
+        {error && <div className={styles.errorBox}>{error}</div>}
+        {success && <div className={styles.successBox}>{success}</div>}
+
+        {selectedUser && (
+          <>
+            {/* User Details */}
+            <section className={styles.userDetailsSection}>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>User Details</h2>
+              </div>
+
+              <div className={styles.detailGrid}>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailLabel}>User ID</div>
+                  <div className={styles.detailValue}>{selectedUser.userId}</div>
+                </div>
+
+                <div className={styles.detailBox}>
+                  <div className={styles.detailLabel}>Email</div>
+                  <div className={styles.detailValue}>{selectedUser.email}</div>
+                </div>
+
+                <div className={styles.detailBox}>
+                  <div className={styles.detailLabel}>Role</div>
+                  <div className={styles.detailValue}>
+                    <span className={selectedUser.role === "ADMIN" ? styles.statusPill : `${styles.statusPill} ${styles.statusActive}`}>
+                      {selectedUser.role || "USER"}
+                    </span>
+                  </div>
+                </div>
+
+                {selectedUser.role !== "ADMIN" && (
+                  <div className={styles.detailBox}>
+                    <div className={styles.detailLabel}>Account Count</div>
+                    <div className={styles.detailValue}>
+                      {userAccounts.length} account(s)
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {selectedUser.role === "ADMIN" ? (
+              /* Admin-specific view */
+              <section className={styles.placeholderSection}>
+                <p className={styles.placeholderText}>
+                  Admin users do not have transferable accounts. View this admin's activity in the Audit Log section.
+                </p>
+              </section>
+            ) : (
+              /* Regular user view with accounts and actions */
+              <>
+                {/* Accounts List */}
+                <section className={styles.accountsList}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Accounts</h2>
+                  </div>
+
+                  {userAccounts.length === 0 ? (
+                    <p className={styles.placeholderText}>No accounts found for this user.</p>
+                  ) : (
+                    userAccounts.map((account) => (
+                      <div key={account.accountId} className={styles.accountCard}>
+                        <div className={styles.accountHeader}>
+                          <div className={styles.accountId}>
+                            Account #{account.accountId}
+                          </div>
+                          <span className={getStatusClass(account.status)}>
+                            {account.status}
+                          </span>
+                        </div>
+
+                        <div className={styles.detailGrid}>
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Account Type</div>
+                            <div className={styles.detailValue}>{account.accountType}</div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Currency</div>
+                            <div className={styles.detailValue}>{account.currency}</div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Balance</div>
+                            <div className={styles.detailValue}>
+                              {formatMoney(account.balanceCents, account.currency)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={styles.accountActions} style={{ marginTop: "12px" }}>
+                          {account.status.toUpperCase() === "ACTIVE" && (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => handleFreezeAccount(account.accountId)}
+                            >
+                              Freeze Account
+                            </button>
+                          )}
+
+                          {account.status.toUpperCase() === "FROZEN" && (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => handleUnfreezeAccount(account.accountId)}
+                            >
+                              Unfreeze Account
+                            </button>
+                          )}
+
+                          {(account.status.toUpperCase() === "ACTIVE" || account.status.toUpperCase() === "FROZEN") && (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => handleCloseAccount(account.accountId)}
+                              disabled={account.balanceCents !== 0}
+                              title={account.balanceCents !== 0 ? "Cannot close account with non-zero balance" : ""}
+                            >
+                              Close Account
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </section>
+
+                {/* Account Activity Summary */}
+                <section className={styles.accountsList}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Account Activity Summary</h2>
+                  </div>
+
+                  {activitySummary.length === 0 ? (
+                    <p className={styles.placeholderText}>No activity data available.</p>
+                  ) : (
+                    activitySummary.map((summary) => (
+                      <div key={summary.accountId} className={styles.accountCard}>
+                        <div className={styles.accountHeader}>
+                          <div className={styles.accountId}>
+                            Account #{summary.accountId} ({summary.accountType})
+                          </div>
+                        </div>
+
+                        <div className={styles.detailGrid}>
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Current Balance</div>
+                            <div className={styles.detailValue}>
+                              {formatMoney(summary.currentBalanceCents, summary.currency)}
+                            </div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Transfers Sent</div>
+                            <div className={styles.detailValue}>
+                              {summary.totalTransfersSent} ({formatMoney(summary.totalAmountSentCents, summary.currency)})
+                            </div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Transfers Received</div>
+                            <div className={styles.detailValue}>
+                              {summary.totalTransfersReceived} ({formatMoney(summary.totalAmountReceivedCents, summary.currency)})
+                            </div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Account Created</div>
+                            <div className={styles.detailValue}>{formatDate(summary.accountCreatedAt)}</div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Last Activity</div>
+                            <div className={styles.detailValue}>
+                              {summary.lastActivityAt ? formatDateTime(summary.lastActivityAt) : "No activity"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </section>
+
+                {/* Risk Profile */}
+                <section className={styles.accountsList}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Risk Profile</h2>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <label style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                        Show last:
+                      </label>
+                      <select
+                        value={riskLimit}
+                        onChange={(e) => handleRiskLimitChange(Number(e.target.value))}
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--border)",
+                          background: "var(--surface)",
+                          color: "var(--text)",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <option value={5}>5 transfers</option>
+                        <option value={10}>10 transfers</option>
+                        <option value={15}>15 transfers</option>
+                        <option value={20}>20 transfers</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {riskProfile ? (
+                    <>
+                      <div className={styles.detailGrid} style={{ marginBottom: "16px" }}>
+                        <div className={styles.detailBox}>
+                          <div className={styles.detailLabel}>Held Transfers</div>
+                          <div className={styles.detailValue}>{riskProfile.totalHeldTransfers}</div>
+                        </div>
+
+                        <div className={styles.detailBox}>
+                          <div className={styles.detailLabel}>Blocked Transfers</div>
+                          <div className={styles.detailValue}>{riskProfile.totalBlockedTransfers}</div>
+                        </div>
+
+                        <div className={styles.detailBox}>
+                          <div className={styles.detailLabel}>Rejected Transfers</div>
+                          <div className={styles.detailValue}>{riskProfile.totalRejectedTransfers}</div>
+                        </div>
+
+                        <div className={styles.detailBox}>
+                          <div className={styles.detailLabel}>Average Risk Score</div>
+                          <div className={styles.detailValue}>
+                            {riskProfile.averageRiskScore != null
+                              ? riskProfile.averageRiskScore.toFixed(1)
+                              : "N/A"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {riskProfile.recentRiskReasons.length > 0 ? (
+                        <>
+                          <h3 style={{ margin: "16px 0 12px", fontSize: "14px", fontWeight: "700" }}>
+                            Recent Risk Flags (last {riskLimit})
+                          </h3>
+                          <div className={styles.riskFlagsContainer}>
+                            {riskProfile.recentRiskReasons.map((item) => (
+                              <div key={item.transferId} className={styles.accountCard}>
+                                <div className={styles.detailGrid}>
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Transfer ID</div>
+                                    <div className={styles.detailValue}>#{item.transferId}</div>
+                                  </div>
+
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Status</div>
+                                    <div className={styles.detailValue}>
+                                      <span className={getStatusClass(item.status)}>{item.status}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Amount</div>
+                                    <div className={styles.detailValue}>
+                                      {formatMoney(item.amountCents, item.currency)}
+                                    </div>
+                                  </div>
+
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Risk Score</div>
+                                    <div className={styles.detailValue}>{item.riskScore ?? "N/A"}</div>
+                                  </div>
+
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Risk Decision</div>
+                                    <div className={styles.detailValue}>{item.riskDecision || "N/A"}</div>
+                                  </div>
+
+                                  <div className={styles.detailBox}>
+                                    <div className={styles.detailLabel}>Created</div>
+                                    <div className={styles.detailValue}>{formatDateTime(item.createdAt)}</div>
+                                  </div>
+                                </div>
+
+                                {item.riskReasons && (
+                                  <div style={{ marginTop: "12px", padding: "8px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)" }}>
+                                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                                      Risk Reasons:
+                                    </div>
+                                    <div style={{ fontSize: "13px", color: "var(--text)" }}>
+                                      {item.riskReasons}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <p className={styles.placeholderText}>No recent risk flags found.</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className={styles.placeholderText}>Loading risk profile...</p>
+                  )}
+                </section>
+
+                {/* Payees */}
+                <section className={styles.accountsList}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Payees</h2>
+                  </div>
+
+                  {payees.length === 0 ? (
+                    <p className={styles.placeholderText}>No payees found for this user.</p>
+                  ) : (
+                    payees.map((payee) => (
+                      <div key={payee.payeeId} className={styles.accountCard}>
+                        <div className={styles.accountHeader}>
+                          <div className={styles.accountId}>{payee.payeeEmail}</div>
+                          <span className={getStatusClass(payee.status)}>{payee.status}</span>
+                        </div>
+
+                        <div className={styles.detailGrid}>
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Payee User ID</div>
+                            <div className={styles.detailValue}>#{payee.payeeUserId}</div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Label</div>
+                            <div className={styles.detailValue}>{payee.label || "-"}</div>
+                          </div>
+
+                          <div className={styles.detailBox}>
+                            <div className={styles.detailLabel}>Added On</div>
+                            <div className={styles.detailValue}>{formatDate(payee.createdAt)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </section>
+              </>
+            )}
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}

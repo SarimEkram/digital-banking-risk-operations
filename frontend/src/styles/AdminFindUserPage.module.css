@@ -305,3 +305,28 @@
   font-size: 13px;
   font-style: italic;
 }
+
+.riskFlagsContainer {
+  max-height: 800px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* Webkit scrollbar styling for risk flags */
+.riskFlagsContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.riskFlagsContainer::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.riskFlagsContainer::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.riskFlagsContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

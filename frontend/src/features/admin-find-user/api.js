@@ -75,10 +75,49 @@ export async function unfreezeAccount(accountId) {
 // Close an account
 export async function closeAccount(accountId) {
   const { ok, status, body } = await apiRequest(
-    `/api/admin/accounts/{accountId}/close`,
+    `/api/admin/accounts/${accountId}/close`,
     {
       method: "POST",
     }
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Get activity summary for user
+export async function getUserActivitySummary(userId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/users/${userId}/activity-summary`
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Get risk profile for user
+export async function getUserRiskProfile(userId, limit = 5) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/users/${userId}/risk-profile?limit=${limit}`
+  );
+
+  if (!ok) {
+    throw buildError(status, body);
+  }
+
+  return body;
+}
+
+// Get payees for user
+export async function getUserPayees(userId) {
+  const { ok, status, body } = await apiRequest(
+    `/api/admin/users/${userId}/payees`
   );
 
   if (!ok) {
