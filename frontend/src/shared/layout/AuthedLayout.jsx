@@ -64,12 +64,13 @@ export default function AuthedLayout() {
             <NavLink to="/home" className={linkClass}>Home</NavLink>
 
             {role !== "ADMIN" && (
-              <>
-                <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
-                <NavLink to="/payees" className={linkClass}>Payees</NavLink>
-                <NavLink to="/activity" className={linkClass}>Activity</NavLink>
-              </>
-            )}
+                  <>
+                    <NavLink to="/transfer" className={linkClass}>Transfer</NavLink>
+                    <NavLink to="/payees" className={linkClass}>Payees</NavLink>
+                    <NavLink to="/activity" className={linkClass}>Activity</NavLink>
+                    <NavLink to="/statements" className={linkClass}>Statements</NavLink>
+                  </>
+                )}
 
             {role === "ADMIN" && (
               <>

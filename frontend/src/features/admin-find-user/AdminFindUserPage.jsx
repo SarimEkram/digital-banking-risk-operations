@@ -75,6 +75,9 @@ export default function AdminFindUserPage() {
 
   const [activitySummary, setActivitySummary] = useState([]);
   const [riskProfile, setRiskProfile] = useState(null);
+  const [statementYear, setStatementYear] = useState("");
+  const [statementMonth, setStatementMonth] = useState("");
+  const [downloadingStatement, setDownloadingStatement] = useState(false);
   const [riskLimit, setRiskLimit] = useState(5);
   const [payees, setPayees] = useState([]);
 
@@ -257,6 +260,53 @@ export default function AdminFindUserPage() {
     }
   }
 
+  async function handleDownloadStatement() {
+      if (!selectedUser?.userId || !statementYear || !statementMonth) {
+        setError("Please select both year and month");
+        return;
+      }
+
+      setDownloadingStatement(true);
+      setError("");
+      setSuccess("");
+
+      try {
+        const token = localStorage.getItem("dbrisk.accessToken");
+        const response = await fetch(
+          `/api/admin/users/${selectedUser.userId}/statement?year=${statementYear}&month=${statementMonth}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to download statement");
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `statement_user${selectedUser.userId}_${statementYear}_${String(statementMonth).padStart(2, "0")}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        setSuccess(`Statement for ${statementMonth}/${statementYear} downloaded successfully`);
+      } catch (err) {
+        if (err?.status === 401) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        setError(err?.message || "Failed to download statement");
+      } finally {
+        setDownloadingStatement(false);
+      }
+    }
+
   if (checkingRole) {
     return (
       <div className={styles.page}>
@@ -437,6 +487,71 @@ export default function AdminFindUserPage() {
                 <section className={styles.accountsList}>
                   <div className={styles.sectionHeader}>
                     <h2 className={styles.sectionTitle}>Account Activity Summary</h2>
+                  </div>
+
+                  {/* Monthly Statement Download */}
+                  <div className={styles.statementDownloadSection}>
+                    <h3 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px" }}>
+                      Download Monthly Statement
+                    </h3>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "120px" }}>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Year</span>
+                        <input
+                          type="number"
+                          value={statementYear}
+                          onChange={(e) => setStatementYear(e.target.value)}
+                          placeholder="2026"
+                          min="2020"
+                          max="2100"
+                          style={{
+                            padding: "8px 12px",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "14px",
+                          }}
+                        />
+                      </label>
+
+                      <label style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "120px" }}>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Month</span>
+                        <select
+                          value={statementMonth}
+                          onChange={(e) => setStatementMonth(e.target.value)}
+                          style={{
+                            padding: "8px 12px",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "14px",
+                            background: "var(--surface)",
+                          }}
+                        >
+                          <option value="">Select month</option>
+                          <option value="1">January</option>
+                          <option value="2">February</option>
+                          <option value="3">March</option>
+                          <option value="4">April</option>
+                          <option value="5">May</option>
+                          <option value="6">June</option>
+                          <option value="7">July</option>
+                          <option value="8">August</option>
+                          <option value="9">September</option>
+                          <option value="10">October</option>
+                          <option value="11">November</option>
+                          <option value="12">December</option>
+                        </select>
+                      </label>
+
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        onClick={handleDownloadStatement}
+                        disabled={downloadingStatement || !statementYear || !statementMonth}
+                        style={{ marginBottom: "0" }}
+                      >
+                        {downloadingStatement ? "Downloading..." : "Download PDF"}
+                      </button>
+                    </div>
                   </div>
 
                   {activitySummary.length === 0 ? (

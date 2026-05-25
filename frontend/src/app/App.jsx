@@ -15,6 +15,7 @@ import AdminRiskPage from "../features/admin-risk/AdminRiskPage.jsx";
 import AdminDepositPage from "../features/admin-deposit/AdminDepositPage.jsx";
 import AdminAuditPage from "../features/admin-audit/AdminAuditPage.jsx";
 import AdminFindUserPage from "../features/admin-find-user/AdminFindUserPage.jsx";
+import StatementsPage from "../features/statements/StatementsPage.jsx";
 
 export default function App() {
   return (
@@ -59,6 +60,15 @@ export default function App() {
           element={
             <RequireUser>
               <ActivityPage />
+            </RequireUser>
+          }
+        />
+
+        <Route
+          path="statements"
+          element={
+            <RequireUser>
+              <StatementsPage />
             </RequireUser>
           }
         />

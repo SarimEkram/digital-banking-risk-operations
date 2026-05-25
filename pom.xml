@@ -114,6 +114,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- PDF Generation (Flying Saucer with iText) -->
+        <dependency>
+            <groupId>org.xhtmlrenderer</groupId>
+            <artifactId>flying-saucer-pdf-itext5</artifactId>
+            <version>9.1.22</version>
+        </dependency>
+
     </dependencies>
 
     <build>
