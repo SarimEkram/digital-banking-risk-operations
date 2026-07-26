@@ -4,6 +4,7 @@ import Card from "../../shared/ui/Card";
 import { apiRequest } from "../../shared/api/http";
 
 import { getMe, getAccounts } from "./api";
+import { listTransfers } from "../activity/api";
 import styles from "../../styles/HomePage.module.css";
 
 function formatMoney(cents, currency = "CAD") {
@@ -17,6 +18,19 @@ function formatMoney(cents, currency = "CAD") {
 
 function formatCount(n) {
   return new Intl.NumberFormat(undefined).format(Number(n || 0));
+}
+
+function formatDateTime(iso) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso || "-";
+  }
 }
 
 function statusTone(status) {
@@ -33,6 +47,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [recent, setRecent] = useState([]);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
 
@@ -103,6 +118,15 @@ export default function HomePage() {
       }
 
       setAccounts(Array.isArray(accRes.body) ? accRes.body : []);
+
+      // Recent activity is a best-effort preview; failure here shouldn't block the dashboard.
+      try {
+        const recentData = await listTransfers({ limit: 5 });
+        setRecent(Array.isArray(recentData?.items) ? recentData.items : []);
+      } catch {
+        setRecent([]);
+      }
+
       setLoading(false);
     } catch {
       setError("Failed to load your dashboard. Please try again.");
@@ -144,6 +168,7 @@ export default function HomePage() {
             <UserDashboard
               me={me}
               accounts={accounts}
+              recent={recent}
               total={total}
               navigate={navigate}
             />
@@ -262,103 +287,157 @@ function OutcomeChip({ tone, label, value }) {
   );
 }
 
-function UserDashboard({ me, accounts, total, navigate }) {
+function UserDashboard({ me, accounts, recent, total, navigate }) {
   return (
-    <div className={styles.grid}>
-      <section className={styles.panel}>
-        <div className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Profile</h2>
-        </div>
+    <>
+      <div className={styles.grid}>
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Profile</h2>
+          </div>
 
-        <div className={styles.kv}>
-          <div className={styles.kvRow}>
-            <span className={styles.kvKey}>User ID</span>
-            <span className={styles.kvVal}>{me?.userId ?? "-"}</span>
-          </div>
-          <div className={styles.kvRow}>
-            <span className={styles.kvKey}>Email</span>
-            <span className={styles.kvVal}>{me?.email ?? "-"}</span>
-          </div>
-          <div className={styles.kvRow}>
-            <span className={styles.kvKey}>Role</span>
-            <span className={styles.kvVal}>
-              <span className={`${styles.pill} ${styles.pillUser}`}>
-                {me?.role ?? "UNKNOWN"}
+          <div className={styles.kv}>
+            <div className={styles.kvRow}>
+              <span className={styles.kvKey}>User ID</span>
+              <span className={styles.kvVal}>{me?.userId ?? "-"}</span>
+            </div>
+            <div className={styles.kvRow}>
+              <span className={styles.kvKey}>Email</span>
+              <span className={styles.kvVal}>{me?.email ?? "-"}</span>
+            </div>
+            <div className={styles.kvRow}>
+              <span className={styles.kvKey}>Role</span>
+              <span className={styles.kvVal}>
+                <span className={`${styles.pill} ${styles.pillUser}`}>
+                  {me?.role ?? "UNKNOWN"}
+                </span>
               </span>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Accounts</h2>
+            <span className={styles.panelSub}>
+              {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
             </span>
           </div>
-        </div>
-      </section>
 
-      <section className={styles.panel}>
+          <div className={styles.balanceHero}>
+            <div className={styles.balanceLabel}>Total available</div>
+            <div className={styles.balanceValue}>{total}</div>
+          </div>
+
+          {accounts.length === 0 ? (
+            <p className={styles.sub}>No accounts found.</p>
+          ) : (
+            <div className={styles.acctList}>
+              {accounts.map((a) => (
+                <div className={styles.acctRow} key={a.id}>
+                  <div className={styles.acctMain}>
+                    <div className={styles.acctName}>
+                      <span className={styles.mono}>Account • {a.id}</span>
+                    </div>
+                    <div className={styles.acctMeta}>
+                      <span className={statusTone(a.status)}>{a.status}</span>
+                      <span className={styles.dot} />
+                      <span className={styles.mono}>{a.currency}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.acctBal}>
+                    <div className={styles.acctBalLabel}>Available</div>
+                    <div className={styles.acctBalValue}>
+                      {formatMoney(a.balanceCents, a.currency)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className={styles.divider} />
+
+          <div className={styles.ctaRow}>
+            <div>
+              <h3 className={styles.ctaTitle}>Quick actions</h3>
+              <p className={styles.sub}>
+                Manage payees, send transfers, and track activity from the main navigation.
+              </p>
+            </div>
+
+            <div className={styles.ctaActions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => navigate("/transfer")}
+              >
+                Transfer money
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => navigate("/statements")}
+              >
+                View statements
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section className={`${styles.panel} ${styles.recentPanel}`}>
         <div className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Accounts</h2>
-          <span className={styles.panelSub}>
-            {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
-          </span>
+          <h2 className={styles.panelTitle}>Recent activity</h2>
+          <button
+            type="button"
+            className={styles.linkButton}
+            onClick={() => navigate("/activity")}
+          >
+            View all
+          </button>
         </div>
 
-        <div className={styles.balanceHero}>
-          <div className={styles.balanceLabel}>Total available</div>
-          <div className={styles.balanceValue}>{total}</div>
-        </div>
-
-        {accounts.length === 0 ? (
-          <p className={styles.sub}>No accounts found.</p>
+        {recent.length === 0 ? (
+          <p className={styles.sub}>No transfers yet.</p>
         ) : (
-          <div className={styles.acctList}>
-            {accounts.map((a) => (
-              <div className={styles.acctRow} key={a.id}>
-                <div className={styles.acctMain}>
-                  <div className={styles.acctName}>
-                    <span className={styles.mono}>Account • {a.id}</span>
+          <div className={styles.recentList}>
+            {recent.map((t) => {
+              const isSent = String(t.direction || "").toUpperCase() === "SENT";
+              return (
+                <div className={styles.recentRow} key={t.id}>
+                  <div className={styles.recentLeft}>
+                    <span
+                      className={`${styles.pill} ${
+                        isSent ? styles.pillWarn : styles.pillGood
+                      }`}
+                    >
+                      {isSent ? "Sent" : "Received"}
+                    </span>
+                    <div className={styles.recentMeta}>
+                      <div className={styles.recentParty}>
+                        {t.counterpartyEmail || "-"}
+                      </div>
+                      <div className={styles.recentTime}>
+                        {formatDateTime(t.createdAt)}
+                      </div>
+                    </div>
                   </div>
-                  <div className={styles.acctMeta}>
-                    <span className={statusTone(a.status)}>{a.status}</span>
-                    <span className={styles.dot} />
-                    <span className={styles.mono}>{a.currency}</span>
-                  </div>
-                </div>
 
-                <div className={styles.acctBal}>
-                  <div className={styles.acctBalLabel}>Available</div>
-                  <div className={styles.acctBalValue}>
-                    {formatMoney(a.balanceCents, a.currency)}
+                  <div className={styles.recentRight}>
+                    <div className={styles.recentAmount}>
+                      {isSent ? "-" : "+"}
+                      {formatMoney(t.amountCents, t.currency)}
+                    </div>
+                    <div className={styles.recentStatus}>{t.status}</div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-
-        <div className={styles.divider} />
-
-        <div className={styles.ctaRow}>
-          <div>
-            <h3 className={styles.ctaTitle}>Quick actions</h3>
-            <p className={styles.sub}>
-              Manage payees, send transfers, and track activity from the main navigation.
-            </p>
-          </div>
-
-          <div className={styles.ctaActions}>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={() => navigate("/transfer")}
-            >
-              Transfer money
-            </button>
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => navigate("/statements")}
-            >
-              View statements
-            </button>
-          </div>
-        </div>
       </section>
-    </div>
+    </>
   );
 }
