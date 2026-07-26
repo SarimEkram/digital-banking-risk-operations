@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import TextField from "../../../shared/ui/TextField";
 import Button from "../../../shared/ui/Button";
 import { login } from "../api";
-import { clearAccessToken, setAccessToken } from "../../../shared/auth/token";
+import { setAccessToken } from "../../../shared/auth/token";
 import styles from "../../../styles/AuthForm.module.css";
 
 export default function LoginForm() {
@@ -35,7 +35,6 @@ export default function LoginForm() {
       const token = body?.accessToken;
       if (typeof token === "string" && token.length > 0) {
         setAccessToken(token);
-        setResult({ kind: "success", text: `Login successful\n\nredirecting to /home...` });
         setPassword("");
         navigate("/home", { replace: true });
         return;
@@ -47,11 +46,6 @@ export default function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function onLogout() {
-    clearAccessToken();
-    navigate("/login", { replace: true });
   }
 
   return (
@@ -77,10 +71,6 @@ export default function LoginForm() {
 
         <Button type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Login"}
-        </Button>
-
-        <Button type="button" disabled={loading} onClick={onLogout}>
-          Logout (clear token)
         </Button>
       </form>
 

@@ -94,9 +94,13 @@
 
 .actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
   margin-top: 4px;
+}
+
+/* Override the shared Button's default max-width so it fills the form column. */
+.submitButton {
+  max-width: none !important;
+  margin-top: 0 !important;
 }
 
 .hint {
@@ -126,6 +130,39 @@
   border-color: var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-text);
+}
+
+/* ===== Success / held confirmation ===== */
+.successBox {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.reviewBox {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.successTitle {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.successDetail {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.successMeta {
+  font-size: 12px;
+  opacity: 0.85;
 }
 
 .acctList {

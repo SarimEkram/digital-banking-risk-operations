@@ -48,7 +48,6 @@ export default function TransferPage() {
   const [amount, setAmount] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
-  const [lastKey, setLastKey] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
@@ -163,7 +162,6 @@ export default function TransferPage() {
 
     // KEY CHANGE: reuse the same key for retries of the same intent
     const key = getOrCreateDraftIdemKey();
-    setLastKey(key);
 
     setSubmitting(true);
 
@@ -194,13 +192,15 @@ export default function TransferPage() {
     setAmount("");
   }
 
+  const isHeld = result && String(result.status || "").toUpperCase() === "PENDING_REVIEW";
+
   return (
     <div className={styles.page}>
       <Card className={styles.card}>
         <div className={styles.header}>
           <div>
             <h1 className={styles.title}>Transfer</h1>
-            <p className={styles.sub}>Send money to an active payee (Idempotency-Key required).</p>
+            <p className={styles.sub}>Send money to one of your active payees.</p>
           </div>
         </div>
 
@@ -269,7 +269,11 @@ export default function TransferPage() {
                 )}
 
                 <div className={styles.actions}>
-                  <Button type="submit" disabled={submitting || accounts.length === 0 || payees.length === 0}>
+                  <Button
+                    className={styles.submitButton}
+                    type="submit"
+                    disabled={submitting || accounts.length === 0 || payees.length === 0}
+                  >
                     {submitting ? "Sending..." : "Send transfer"}
                   </Button>
                 </div>
@@ -279,14 +283,23 @@ export default function TransferPage() {
                 <p className={styles.hint}>Add a payee first, then come back here to send money.</p>
               )}
 
-              {lastKey && (
-                <p className={styles.hint}>
-                  Last Idempotency-Key: <span className={styles.mono}>{lastKey}</span>
-                </p>
-              )}
-
               {error && <pre className={`${styles.output} ${styles.outputError}`}>{error}</pre>}
-              {result && <pre className={styles.output}>{JSON.stringify(result, null, 2)}</pre>}
+
+              {result && (
+                <div className={`${styles.successBox} ${isHeld ? styles.reviewBox : ""}`}>
+                  <div className={styles.successTitle}>
+                    {isHeld ? "Transfer held for review" : "Transfer sent"}
+                  </div>
+                  <div className={styles.successDetail}>
+                    {formatMoney(result.amountCents, result.currency)} to{" "}
+                    {result.toEmail || selectedPayee?.email || "payee"}
+                  </div>
+                  <div className={styles.successMeta}>
+                    Transfer #{result.id} • {result.status}
+                    {isHeld && " • an admin will review this shortly"}
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className={styles.panel}>
