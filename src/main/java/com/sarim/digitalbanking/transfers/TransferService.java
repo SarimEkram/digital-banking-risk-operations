@@ -103,13 +103,12 @@ public class TransferService {
         Long payeeUserId = payee.getPayeeUser().getId();
 
         Long toAccountId = accountRepository
-                .findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(
+                .findIdByUserIdAndAccountTypeAndCurrencyAndStatus(
                         payeeUserId,
                         AccountType.CHEQUING,
                         currency,
                         "ACTIVE"
                 )
-                .map(AccountEntity::getId)
                 .orElseThrow(() -> new IllegalArgumentException("payee account not found"));
 
         if (req.fromAccountId().equals(toAccountId)) {
@@ -117,6 +116,8 @@ public class TransferService {
         }
 
         String requestHash = idempotencyRequestHasher.hashUserTransfer(actorUserId, req);
+
+        transferRepository.lockIdempotencyKey(idempotencyKey);
 
         var storedReplay = idempotencyReplayService.findStoredTransferReplay(idempotencyKey, requestHash);
         if (storedReplay.isPresent()) {

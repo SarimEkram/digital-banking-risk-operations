@@ -15,8 +15,21 @@ public interface AccountRepository extends JpaRepository<AccountEntity, Long> {
     Optional<AccountEntity> findByIdAndUser_Id(Long id, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select a from AccountEntity a where a.id in :ids")
+    @Query("select a from AccountEntity a where a.id in :ids order by a.id")
     List<AccountEntity> findByIdInForUpdate(@Param("ids") List<Long> ids);
+
+    // Id-only lookup so no AccountEntity enters the persistence context before the row lock is taken.
+    @Query("""
+            select a.id from AccountEntity a
+            where a.user.id = :userId and a.accountType = :accountType
+              and upper(a.currency) = upper(:currency) and upper(a.status) = upper(:status)
+            """)
+    Optional<Long> findIdByUserIdAndAccountTypeAndCurrencyAndStatus(
+            @Param("userId") Long userId,
+            @Param("accountType") AccountType accountType,
+            @Param("currency") String currency,
+            @Param("status") String status
+    );
 
     // Rule A helper (for later transfer-by-payee-email): payee's ACTIVE CHEQUING account in a currency
     Optional<AccountEntity> findByUserIdAndAccountTypeAndCurrencyIgnoreCaseAndStatusIgnoreCase(

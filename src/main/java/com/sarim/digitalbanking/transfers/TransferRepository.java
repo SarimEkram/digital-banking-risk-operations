@@ -55,4 +55,9 @@ public interface TransferRepository extends JpaRepository<TransferEntity, Long> 
             @Param("beforeId") Long beforeId,
             Pageable pageable
     );
+
+    // Serializes concurrent requests sharing an idempotency key until the transaction ends.
+    @org.springframework.data.jpa.repository.Query(
+            value = "select cast(pg_advisory_xact_lock(hashtext(:key)) as text)", nativeQuery = true)
+    String lockIdempotencyKey(@org.springframework.data.repository.query.Param("key") String key);
 }
